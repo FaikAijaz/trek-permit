@@ -7,6 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/types/jwt-payload.type';
@@ -18,6 +19,9 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Requesting an OTP costs an SMS and hands out a fresh set of verify
+  // attempts, so it gets a much tighter limit than the app-wide default.
+  @Throttle({ default: { limit: 3, ttl: 600_000 } })
   @Post('otp/request')
   @HttpCode(HttpStatus.OK)
   async requestOtp(@Body() dto: RequestOtpDto): Promise<{ message: string }> {

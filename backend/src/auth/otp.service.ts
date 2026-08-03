@@ -3,6 +3,8 @@ import { promisify } from 'node:util';
 import { scrypt as scryptCallback } from 'node:crypto';
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -38,6 +40,29 @@ export class OtpService {
 
   /** Generates a new OTP, stores its hash, and returns the plaintext code to send. */
   async generate(mobile: string): Promise<string> {
+    // Per-mobile limit, independent of the controller's IP-based @Throttle.
+    // IP-based throttling alone isn't enough here: carrier-grade NAT is
+    // common on Indian mobile networks, so many unrelated real users can
+    // share one public IP (false-positive risk), while an attacker with
+    // many IPs could still SMS-bomb one specific number without this check.
+    const requestLimit = this.config.get<number>('OTP_REQUEST_LIMIT', 3);
+    const requestWindowMinutes = this.config.get<number>(
+      'OTP_REQUEST_WINDOW_MINUTES',
+      10,
+    );
+    const windowStart = new Date(Date.now() - requestWindowMinutes * 60_000);
+
+    const recentCount = await this.prisma.otpCode.count({
+      where: { mobile, createdAt: { gt: windowStart } },
+    });
+
+    if (recentCount >= requestLimit) {
+      throw new HttpException(
+        'Too many OTP requests for this number — try again later',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const codeHash = await hashCode(code);
 
