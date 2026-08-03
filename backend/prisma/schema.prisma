@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -10,4 +8,313 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────
+
+enum UserRole {
+  trekker
+  officer
+  admin
+
+  @@map("user_role")
+}
+
+enum RouteDifficulty {
+  easy
+  moderate
+  difficult
+
+  @@map("route_difficulty")
+}
+
+enum ApplicationType {
+  individual
+  group
+
+  @@map("application_type")
+}
+
+enum GroupType {
+  private
+  commercial
+
+  @@map("group_type")
+}
+
+enum ApplicationStatus {
+  draft
+  submitted
+  under_review
+  approved
+  rejected
+  permit_issued
+
+  @@map("application_status")
+}
+
+enum Gender {
+  male
+  female
+  other
+
+  @@map("gender")
+}
+
+/// See BUILD_SPEC.md Section 3 — only the transitions documented there are
+/// legal. Enforce that in a single guarded service function, never with a
+/// bare `UPDATE participants SET status = ...`.
+enum ParticipantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CORRECTION_REQUESTED
+  EXCLUDED
+  REVOKED
+
+  @@map("participant_status")
+}
+
+enum DocumentType {
+  aadhaar
+  fitness_certificate
+  photograph
+  guardian_consent
+  other
+
+  @@map("document_type")
+}
+
+enum PermitStatus {
+  active
+  revoked
+
+  @@map("permit_status")
+}
+
+// ── Models ─────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  mobile    String   @unique @db.VarChar(15)
+  fullName  String?  @map("full_name") @db.VarChar(200)
+  email     String?  @db.VarChar(200)
+  address   String?
+  role      UserRole
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  applicationsApplied  Application[] @relation("ApplicantUser")
+  applicationsDecided  Application[] @relation("DecidedByUser")
+  participantsReviewed Participant[] @relation("ReviewedByUser")
+  permitsIssued        Permit[]      @relation("IssuedByUser")
+  revocationsMade      Revocation[]  @relation("RevokedByUser")
+  auditLogEntries      AuditLog[]    @relation("ActorUser")
+
+  @@map("users")
+}
+
+model OtpCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  mobile     String    @db.VarChar(15)
+  codeHash   String    @map("code_hash") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([mobile])
+  @@map("otp_codes")
+}
+
+model TrekRoute {
+  id                String           @id @default(uuid()) @db.Uuid
+  name              String           @db.VarChar(200)
+  region            String           @db.VarChar(200)
+  description       String?
+  difficulty        RouteDifficulty?
+  isOpen            Boolean          @default(false) @map("is_open")
+  requiredDocuments Json             @default("[]") @map("required_documents")
+  capacityPerDay    Int?             @map("capacity_per_day")
+  minLeadTimeDays   Int              @default(3) @map("min_lead_time_days")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  applications Application[]
+
+  @@map("trek_routes")
+}
+
+model Application {
+  id        String          @id @default(uuid()) @db.Uuid
+  reference String          @unique @db.VarChar(30)
+  type      ApplicationType
+  groupType GroupType?      @map("group_type")
+
+  applicantUserId String @map("applicant_user_id") @db.Uuid
+  applicant       User   @relation("ApplicantUser", fields: [applicantUserId], references: [id])
+
+  trekRouteId String    @map("trek_route_id") @db.Uuid
+  trekRoute   TrekRoute @relation(fields: [trekRouteId], references: [id])
+
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
+  status          ApplicationStatus @default(draft)
+  rejectionReason String?           @map("rejection_reason")
+
+  // Commercial-only — describes this application, not the person leading it.
+  // See BUILD_SPEC.md Section 4 note on why these live here, not on participants.
+  operatorRegistrationNo String?   @map("operator_registration_no") @db.VarChar(100)
+  operatorName           String?   @map("operator_name") @db.VarChar(200)
+  operatorRegValidUntil  DateTime? @map("operator_reg_valid_until") @db.Date
+
+  submittedAt DateTime? @map("submitted_at") @db.Timestamptz
+  decidedAt   DateTime? @map("decided_at") @db.Timestamptz
+
+  decidedById String? @map("decided_by") @db.Uuid
+  decidedBy   User?   @relation("DecidedByUser", fields: [decidedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  participants Participant[]
+  permits      Permit[]
+
+  @@index([applicantUserId])
+  @@index([trekRouteId])
+  @@index([decidedById])
+  @@map("applications")
+}
+
+/// One table for individual applicants, trek leaders, and group members —
+/// see BUILD_SPEC.md Section 4 note on why this isn't split in two.
+model Participant {
+  id            String      @id @default(uuid()) @db.Uuid
+  applicationId String      @map("application_id") @db.Uuid
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  isLeader Boolean @default(false) @map("is_leader")
+
+  fullName    String    @map("full_name") @db.VarChar(200)
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  gender      Gender?
+  address     String?
+  mobile      String?   @db.VarChar(15)
+
+  identityNumber String @map("identity_number") @db.VarChar(20)
+  identityLast4  String @map("identity_last4") @db.VarChar(4) // denormalised for the permit payload
+
+  emergencyContactName   String? @map("emergency_contact_name") @db.VarChar(200)
+  emergencyContactMobile String? @map("emergency_contact_mobile") @db.VarChar(15)
+
+  medicalDeclaration  Boolean @default(false) @map("medical_declaration")
+  isGuide             Boolean @default(false) @map("is_guide")
+  guideRegistrationNo String? @map("guide_registration_no") @db.VarChar(100)
+
+  status        ParticipantStatus @default(PENDING)
+  officerRemark String?           @map("officer_remark")
+  resubmitted   Boolean           @default(false)
+
+  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz
+  reviewedById String?   @map("reviewed_by") @db.Uuid
+  reviewedBy   User?     @relation("ReviewedByUser", fields: [reviewedById], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  documents Document[]
+
+  @@index([applicationId])
+  @@index([reviewedById])
+  // Supports the prior-rejections lookup in BUILD_SPEC.md Section 4:
+  // "WHERE identity_number = $1 AND status = 'rejected' AND reviewed_at > ..."
+  @@index([identityNumber])
+  @@map("participants")
+}
+
+model Document {
+  id            String      @id @default(uuid()) @db.Uuid
+  participantId String      @map("participant_id") @db.Uuid
+  participant   Participant @relation(fields: [participantId], references: [id])
+
+  documentType     DocumentType @map("document_type")
+  storageKey       String       @map("storage_key") @db.VarChar(500)
+  originalFilename String       @map("original_filename") @db.VarChar(300)
+  mimeType         String       @map("mime_type") @db.VarChar(100)
+  sizeBytes        Int          @map("size_bytes")
+
+  version   Int     @default(1)
+  isCurrent Boolean @default(true) @map("is_current")
+
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+
+  @@index([participantId])
+  @@map("documents")
+}
+
+model Permit {
+  id            String      @id @default(uuid()) @db.Uuid
+  reference     String      @unique @db.VarChar(30)
+  applicationId String      @map("application_id") @db.Uuid
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  schemaVersion Int    @default(1) @map("schema_version")
+  signedPayload String @map("signed_payload")
+  signature     String
+  qrPayload     String @map("qr_payload")
+
+  validFrom  DateTime @map("valid_from") @db.Date
+  validUntil DateTime @map("valid_until") @db.Date
+
+  issuedAt   DateTime @default(now()) @map("issued_at") @db.Timestamptz
+  issuedById String   @map("issued_by") @db.Uuid
+  issuedBy   User     @relation("IssuedByUser", fields: [issuedById], references: [id])
+
+  status PermitStatus @default(active)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  revocation Revocation?
+
+  @@index([applicationId])
+  @@index([issuedById])
+  @@map("permits")
+}
+
+model Revocation {
+  id       String @id @default(uuid()) @db.Uuid
+  // @unique enforces at most one revocation per permit — permits.status is
+  // binary (active|revoked), so more than one revocation row would be a
+  // data-integrity bug, not a valid history.
+  permitId String @unique @map("permit_id") @db.Uuid
+  permit   Permit @relation(fields: [permitId], references: [id])
+
+  reason    String
+  revokedAt DateTime @default(now()) @map("revoked_at") @db.Timestamptz
+
+  revokedById String @map("revoked_by") @db.Uuid
+  revokedBy   User   @relation("RevokedByUser", fields: [revokedById], references: [id])
+
+  @@map("revocations")
+}
+
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  actor       User?   @relation("ActorUser", fields: [actorUserId], references: [id])
+
+  action     String  @db.VarChar(100)
+  entityType String  @map("entity_type") @db.VarChar(50)
+  entityId   String  @map("entity_id") @db.Uuid
+  metadata   Json?
+  ipAddress  String? @map("ip_address") @db.VarChar(45)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@map("audit_log")
 }
