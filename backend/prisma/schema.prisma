@@ -317,3 +317,15 @@ model AuditLog {
   @@index([entityType, entityId])
   @@map("audit_log")
 }
+
+/// Backs atomic, per-year reference numbers (APP-2026-000001, PMT-2026-000001).
+/// One row per (year, entity); incremented via a single INSERT ... ON CONFLICT
+/// ... RETURNING, which Postgres makes race-safe without extra locking.
+model ReferenceCounter {
+  year    Int
+  entity  String @db.VarChar(20)
+  counter Int    @default(0)
+
+  @@id([year, entity])
+  @@map("reference_counters")
+}

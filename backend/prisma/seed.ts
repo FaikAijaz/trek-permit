@@ -5,8 +5,10 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 // Fixed UUID so re-running this script updates the same row instead of
-// creating a duplicate route each time.
-const PILOT_ROUTE_ID = '00000000-0000-0000-0000-000000000001';
+// creating a duplicate route each time. Must be a real RFC4122 v4 UUID --
+// not an all-zeros placeholder -- since class-validator's @IsUUID() (added
+// in Week 2) correctly rejects anything that isn't version/variant valid.
+const PILOT_ROUTE_ID = 'e857e8f0-066b-42d3-aaf0-6b62232242ac';
 
 async function main() {
   const route = await prisma.trekRoute.upsert({

@@ -8,6 +8,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { RoutesModule } from './routes/routes.module';
+import { ReferenceModule } from './reference/reference.module';
+import { ApplicationsModule } from './applications/applications.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -17,8 +20,11 @@ import { RoutesModule } from './routes/routes.module';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     PrismaModule,
     AuditModule,
+    ReferenceModule,
     AuthModule,
     RoutesModule,
+    ApplicationsModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

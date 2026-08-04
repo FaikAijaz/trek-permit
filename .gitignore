@@ -21,6 +21,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Claude Code session/harness state (not project code)
+.claude/
+
 # Prisma
 backend/prisma/migrations/dev.db
 
