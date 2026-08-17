@@ -10,6 +10,7 @@ import {
   ApplicationStatus,
   DocumentType,
   Participant,
+  Permit,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,6 +28,11 @@ const REVIEW_STATUSES: ApplicationStatus[] = ['submitted', 'under_review'];
 type ApplicationWithParticipants = Application & {
   participants: Participant[];
 };
+
+// findOneForUser's shape only — includes the issued permit(s), if any, so
+// the applicant can retrieve it (qrPayload included) straight from their
+// application detail view instead of a separate lookup.
+type ApplicationDetail = ApplicationWithParticipants & { permits: Permit[] };
 
 @Injectable()
 export class ApplicationsService {
@@ -92,9 +98,13 @@ export class ApplicationsService {
     }
 
     const isCommercial = dto.type === 'group' && dto.groupType === 'commercial';
+    // Individual applications keep the original counter key ('application')
+    // from before group support existed — changing it would restart that
+    // counter from 1 and collide with references already issued under it.
+    // 'group' is new in Week 3 and has no history to collide with.
     const reference = await this.referenceService.generate(
       dto.type === 'group' ? 'GRP' : 'APP',
-      dto.type === 'group' ? 'GRP' : 'APP',
+      dto.type === 'group' ? 'group' : 'application',
     );
 
     const application = await this.prisma.application.create({
@@ -156,10 +166,13 @@ export class ApplicationsService {
     id: string,
     requestingUserId: string,
     requestingUserRole: string,
-  ): Promise<ApplicationWithParticipants> {
+  ): Promise<ApplicationDetail> {
     const application = await this.prisma.application.findUnique({
       where: { id },
-      include: { participants: { include: { documents: true } } },
+      include: {
+        participants: { include: { documents: true } },
+        permits: true,
+      },
     });
 
     if (!application) {

@@ -12,6 +12,7 @@ import { ReferenceModule } from './reference/reference.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ParticipantsModule } from './participants/participants.module';
+import { PermitsModule } from './permits/permits.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ParticipantsModule } from './participants/participants.module';
     ApplicationsModule,
     DocumentsModule,
     ParticipantsModule,
+    PermitsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
