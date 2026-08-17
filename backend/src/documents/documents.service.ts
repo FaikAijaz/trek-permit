@@ -1,5 +1,5 @@
 import { extname } from 'node:path';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Document, DocumentType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -22,23 +22,12 @@ export class DocumentsService {
     file: Express.Multer.File,
     uploaderUserId: string,
   ): Promise<Document> {
-    const application =
-      await this.applicationsService.getEditableOwnApplication(
+    const { participant, isCorrection } =
+      await this.applicationsService.getApplicationForDocumentUpload(
         applicationId,
+        participantId,
         uploaderUserId,
       );
-
-    // The application is confirmed to belong to this uploader above; this
-    // just confirms the participant is actually one of *its* participants,
-    // not some other application's — an id that's valid but misplaced.
-    const participant = application.participants.find(
-      (p) => p.id === participantId,
-    );
-    if (!participant) {
-      throw new NotFoundException(
-        `No participant with id ${participantId} on this application`,
-      );
-    }
 
     // Never overwrite: find the current document of this type (if any) and
     // supersede it, rather than mutating it in place.
@@ -78,6 +67,25 @@ export class DocumentsService {
       entityId: document.id,
       metadata: { documentType, version, participantId: participant.id },
     });
+
+    // BUILD_SPEC.md Section 3: CORRECTION_REQUESTED → PENDING happens the
+    // moment the leader re-uploads — it's the applicant's action that
+    // triggers it, not a separate officer click. `resubmitted: true` is
+    // what tells the officer "this came back corrected" on their next look.
+    if (isCorrection) {
+      await this.prisma.participant.update({
+        where: { id: participant.id },
+        data: { status: 'PENDING', resubmitted: true },
+      });
+
+      await this.auditService.log({
+        actorUserId: uploaderUserId,
+        action: 'participant.resubmitted',
+        entityType: 'participant',
+        entityId: participant.id,
+        metadata: { applicationId, documentType },
+      });
+    }
 
     return document;
   }

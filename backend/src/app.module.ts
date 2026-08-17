@@ -11,6 +11,7 @@ import { RoutesModule } from './routes/routes.module';
 import { ReferenceModule } from './reference/reference.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { DocumentsModule } from './documents/documents.module';
+import { ParticipantsModule } from './participants/participants.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { DocumentsModule } from './documents/documents.module';
     RoutesModule,
     ApplicationsModule,
     DocumentsModule,
+    ParticipantsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

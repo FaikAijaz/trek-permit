@@ -5,13 +5,24 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Application, DocumentType, Participant, Prisma } from '@prisma/client';
+import {
+  Application,
+  ApplicationStatus,
+  DocumentType,
+  Participant,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ReferenceService } from '../reference/reference.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { ParticipantDto } from './dto/participant.dto';
 import { UpdateParticipantDto } from './dto/update-participant.dto';
+
+// An application can be edited by its owner (draft) or, for a specific
+// person, corrected while under review (CORRECTION_REQUESTED). Anything
+// else is refused — see getApplicationForDocumentUpload.
+const REVIEW_STATUSES: ApplicationStatus[] = ['submitted', 'under_review'];
 
 type ApplicationWithParticipants = Application & {
   participants: Participant[];
@@ -121,10 +132,23 @@ export class ApplicationsService {
     return application;
   }
 
-  async findAllForUser(applicantUserId: string): Promise<Application[]> {
+  async findAllForUser(
+    applicantUserId: string,
+    status?: ApplicationStatus,
+  ): Promise<Application[]> {
     return this.prisma.application.findMany({
-      where: { applicantUserId },
+      where: { applicantUserId, status },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** The officer's queue — every application, not just one applicant's. */
+  async findAllForReview(status?: ApplicationStatus): Promise<Application[]> {
+    return this.prisma.application.findMany({
+      where: { status },
+      // Oldest submission first — a plain fairness default, not a policy
+      // call; nothing in the spec dictates a review order.
+      orderBy: { submittedAt: 'asc' },
     });
   }
 
@@ -392,5 +416,149 @@ export class ApplicationsService {
     });
 
     return submitted;
+  }
+
+  /**
+   * Officer-only: finalizes the review. BUILD_SPEC.md Section 2, #4 — this
+   * is exactly the gate permit issuance needs, checked here first so the
+   * officer gets a clear answer before ever reaching "Issue Permit".
+   * Other members may still be PENDING/CORRECTION_REQUESTED at this point;
+   * that's fine — see BUILD_SPEC.md Section 2, #5.
+   */
+  async approve(
+    applicationId: string,
+    officerId: string,
+  ): Promise<Application> {
+    const application = await this.prisma.application.findUnique({
+      where: { id: applicationId },
+      include: { participants: true },
+    });
+    if (!application) {
+      throw new NotFoundException(`No application with id ${applicationId}`);
+    }
+    if (!REVIEW_STATUSES.includes(application.status)) {
+      throw new BadRequestException(
+        `Cannot approve an application in status '${application.status}'`,
+      );
+    }
+
+    const leaderApproved = application.participants.some(
+      (p) => p.isLeader && p.status === 'APPROVED',
+    );
+    const anyApproved = application.participants.some(
+      (p) => p.status === 'APPROVED',
+    );
+    if (!leaderApproved || !anyApproved) {
+      throw new BadRequestException(
+        'Cannot approve: the trek leader and at least one participant must be APPROVED first',
+      );
+    }
+
+    const approved = await this.prisma.application.update({
+      where: { id: applicationId },
+      data: {
+        status: 'approved',
+        decidedAt: new Date(),
+        decidedById: officerId,
+      },
+    });
+
+    await this.auditService.log({
+      actorUserId: officerId,
+      action: 'application.approved',
+      entityType: 'application',
+      entityId: application.id,
+      metadata: { reference: application.reference },
+    });
+
+    return approved;
+  }
+
+  /**
+   * Officer-only: application-level rejection — route closed, dates
+   * unavailable, invalid operator registration. Distinct from rejecting a
+   * specific participant (BUILD_SPEC.md Section 2, #3).
+   */
+  async reject(
+    applicationId: string,
+    reason: string,
+    officerId: string,
+  ): Promise<Application> {
+    const application = await this.prisma.application.findUnique({
+      where: { id: applicationId },
+    });
+    if (!application) {
+      throw new NotFoundException(`No application with id ${applicationId}`);
+    }
+    if (!REVIEW_STATUSES.includes(application.status)) {
+      throw new BadRequestException(
+        `Cannot reject an application in status '${application.status}'`,
+      );
+    }
+
+    const rejected = await this.prisma.application.update({
+      where: { id: applicationId },
+      data: {
+        status: 'rejected',
+        rejectionReason: reason,
+        decidedAt: new Date(),
+        decidedById: officerId,
+      },
+    });
+
+    await this.auditService.log({
+      actorUserId: officerId,
+      action: 'application.rejected',
+      entityType: 'application',
+      entityId: application.id,
+      metadata: { reference: application.reference, reason },
+    });
+
+    return rejected;
+  }
+
+  /**
+   * Confirms this user may upload a document for this participant right
+   * now — either editing an in-progress draft, or supplying a correction
+   * for a participant the officer has flagged CORRECTION_REQUESTED while
+   * the application is under review. Anything else is refused: documents
+   * are evidence of what the officer saw at decision time (BUILD_SPEC.md
+   * Section 2, #12), so they can't be swapped in quietly outside those
+   * two windows.
+   */
+  async getApplicationForDocumentUpload(
+    applicationId: string,
+    participantId: string,
+    applicantUserId: string,
+  ): Promise<{
+    application: ApplicationWithParticipants;
+    participant: Participant;
+    isCorrection: boolean;
+  }> {
+    const application = await this.prisma.application.findUnique({
+      where: { id: applicationId },
+      include: { participants: true },
+    });
+    if (!application) {
+      throw new NotFoundException(`No application with id ${applicationId}`);
+    }
+    if (application.applicantUserId !== applicantUserId) {
+      throw new ForbiddenException('This application does not belong to you');
+    }
+
+    const participant = this.findOwnedParticipant(application, participantId);
+
+    const isDraftEdit = application.status === 'draft';
+    const isCorrection =
+      participant.status === 'CORRECTION_REQUESTED' &&
+      REVIEW_STATUSES.includes(application.status);
+
+    if (!isDraftEdit && !isCorrection) {
+      throw new BadRequestException(
+        `Cannot upload documents: application is '${application.status}' and this participant is '${participant.status}'`,
+      );
+    }
+
+    return { application, participant, isCorrection };
   }
 }
