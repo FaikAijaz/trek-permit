@@ -20,7 +20,7 @@ import { UploadDocumentDto } from './dto/upload-document.dto';
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-@Controller('applications/:applicationId/documents')
+@Controller('applications/:applicationId/participants/:participantId/documents')
 @UseGuards(JwtAuthGuard)
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
@@ -43,6 +43,7 @@ export class DocumentsController {
   )
   upload(
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('participantId', ParseUUIDPipe) participantId: string,
     @Body() dto: UploadDocumentDto,
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() user: JwtPayload,
@@ -52,6 +53,7 @@ export class DocumentsController {
     }
     return this.documentsService.upload(
       applicationId,
+      participantId,
       dto.documentType,
       file,
       user.sub,

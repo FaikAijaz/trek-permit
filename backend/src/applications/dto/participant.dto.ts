@@ -6,10 +6,17 @@ import {
   IsString,
   Length,
   Matches,
+  ValidateIf,
 } from 'class-validator';
 import { Gender } from '@prisma/client';
 
-export class ApplicantDto {
+/**
+ * The personal details of one person on an application — the trek leader or
+ * a group member. Both use the same shape (see BUILD_SPEC.md Section 4:
+ * "why one table instead of trek_leaders + group_members") so this DTO is
+ * shared rather than duplicated per role.
+ */
+export class ParticipantDto {
   @IsString()
   @Length(1, 200)
   fullName!: string;
@@ -50,4 +57,16 @@ export class ApplicantDto {
   @IsOptional()
   @IsBoolean()
   medicalDeclaration?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isGuide?: boolean;
+
+  // Only meaningful when isGuide is true — enforced here rather than left to
+  // the officer to notice, since a guide without a registration number isn't
+  // a decidable case, it's an incomplete one.
+  @ValidateIf((dto: ParticipantDto) => dto.isGuide === true)
+  @IsString()
+  @Length(1, 100)
+  guideRegistrationNo?: string;
 }

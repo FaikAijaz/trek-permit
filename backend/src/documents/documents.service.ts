@@ -17,6 +17,7 @@ export class DocumentsService {
 
   async upload(
     applicationId: string,
+    participantId: string,
     documentType: DocumentType,
     file: Express.Multer.File,
     uploaderUserId: string,
@@ -27,20 +28,27 @@ export class DocumentsService {
         uploaderUserId,
       );
 
-    const leader = application.participants.find((p) => p.isLeader);
-    if (!leader) {
-      throw new NotFoundException('No leader participant on this application');
+    // The application is confirmed to belong to this uploader above; this
+    // just confirms the participant is actually one of *its* participants,
+    // not some other application's — an id that's valid but misplaced.
+    const participant = application.participants.find(
+      (p) => p.id === participantId,
+    );
+    if (!participant) {
+      throw new NotFoundException(
+        `No participant with id ${participantId} on this application`,
+      );
     }
 
     // Never overwrite: find the current document of this type (if any) and
     // supersede it, rather than mutating it in place.
     const existing = await this.prisma.document.findFirst({
-      where: { participantId: leader.id, documentType, isCurrent: true },
+      where: { participantId: participant.id, documentType, isCurrent: true },
     });
     const version = existing ? existing.version + 1 : 1;
 
     const ext = extname(file.originalname).toLowerCase();
-    const storageKey = `${leader.id}/${documentType}_v${version}${ext}`;
+    const storageKey = `${participant.id}/${documentType}_v${version}${ext}`;
     await this.storageService.save(storageKey, file.buffer);
 
     if (existing) {
@@ -52,7 +60,7 @@ export class DocumentsService {
 
     const document = await this.prisma.document.create({
       data: {
-        participantId: leader.id,
+        participantId: participant.id,
         documentType,
         storageKey,
         originalFilename: file.originalname,
@@ -68,7 +76,7 @@ export class DocumentsService {
       action: 'document.uploaded',
       entityType: 'document',
       entityId: document.id,
-      metadata: { documentType, version, participantId: leader.id },
+      metadata: { documentType, version, participantId: participant.id },
     });
 
     return document;
