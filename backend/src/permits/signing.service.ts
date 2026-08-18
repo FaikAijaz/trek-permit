@@ -65,4 +65,17 @@ export class SigningService implements OnModuleInit {
       Buffer.from(signatureBase64, 'base64'),
     );
   }
+
+  /**
+   * The raw 32-byte Ed25519 public key as hex — what an offline verifier
+   * (the Field Officer app, via @noble/ed25519) actually needs. The stored
+   * SIGNING_PUBLIC_KEY is DER/SPKI-wrapped (right for Node's own KeyObject
+   * import), which isn't the same bytes a non-Node Ed25519 library expects.
+   * Exporting as JWK sidesteps hand-parsing that DER structure — JWK's `x`
+   * field for an OKP/Ed25519 key *is* the raw public key, base64url-encoded.
+   */
+  getPublicKeyHex(): string {
+    const jwk = this.publicKey.export({ format: 'jwk' }) as { x: string };
+    return Buffer.from(jwk.x, 'base64url').toString('hex');
+  }
 }

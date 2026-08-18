@@ -200,6 +200,27 @@ export class PermitsService {
     return permit;
   }
 
+  /**
+   * What a Field Officer's phone needs to verify permits completely
+   * offline (BUILD_SPEC.md Section 1's defining constraint): the public
+   * key to check a signature against, and every currently-revoked permit,
+   * synced while the phone still has signal and cached locally for later.
+   */
+  getPublicKey(): { publicKeyHex: string } {
+    return { publicKeyHex: this.signingService.getPublicKeyHex() };
+  }
+
+  async listRevocations(): Promise<{ reference: string; revokedAt: Date }[]> {
+    const revocations = await this.prisma.revocation.findMany({
+      include: { permit: { select: { reference: true } } },
+      orderBy: { revokedAt: 'desc' },
+    });
+    return revocations.map((r) => ({
+      reference: r.permit.reference,
+      revokedAt: r.revokedAt,
+    }));
+  }
+
   async findOneForUser(
     id: string,
     requestingUserId: string,

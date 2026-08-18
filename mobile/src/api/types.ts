@@ -89,6 +89,26 @@ export interface Permit {
   status: 'active' | 'revoked';
 }
 
+// Mirrors backend/src/permits/permits.service.ts's PermitPayload — the JSON
+// half of a scanned QR's `<json>.<signature>` string (BUILD_SPEC.md Section
+// 5). Short keys are the spec's, not a mobile-side abbreviation.
+export interface PermitPayload {
+  v: number;
+  pid: string;
+  typ: 'individual' | 'group';
+  gid?: string;
+  gt?: 'private' | 'commercial';
+  op?: { n: string; r: string };
+  ldr: string;
+  rt: string;
+  rid: string;
+  f: string;
+  t: string;
+  n?: number;
+  m?: { n: string; i: string }[];
+  iat: string;
+}
+
 export interface Application {
   id: string;
   reference: string;

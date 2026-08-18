@@ -21,6 +21,27 @@ import { RevokePermitDto } from './dto/revoke-permit.dto';
 export class PermitsController {
   constructor(private readonly permitsService: PermitsService) {}
 
+  // Static routes declared before ':id' — Nest matches routes in
+  // declaration order, so 'public-key'/'revocations' would otherwise be
+  // swallowed by the ':id' pattern below (ParseUUIDPipe would then 400 on
+  // them, since neither is a UUID).
+
+  // What a Field Officer's phone syncs while online, for offline
+  // verification later (see permits.service.ts's getPublicKey/listRevocations).
+  @Get('public-key')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.officer, UserRole.admin)
+  getPublicKey(): { publicKeyHex: string } {
+    return this.permitsService.getPublicKey();
+  }
+
+  @Get('revocations')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.officer, UserRole.admin)
+  listRevocations(): Promise<{ reference: string; revokedAt: Date }[]> {
+    return this.permitsService.listRevocations();
+  }
+
   // Owner (the applicant this permit was issued to) or staff — same
   // ownership rule used everywhere else in the codebase.
   @Get(':id')

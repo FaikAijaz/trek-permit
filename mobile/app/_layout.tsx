@@ -17,10 +17,19 @@ function RootNavigator() {
     );
   }
 
+  // Same binary, separate login (BUILD_SPEC.md Section 1) — the split
+  // happens here, by role, once. Everything under (officer) assumes a
+  // checkpoint officer; everything under (app) assumes a trekker.
+  const isOfficer = user?.role === 'officer' || user?.role === 'admin';
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!!user}>
+      <Stack.Protected guard={!!user && !isOfficer}>
         <Stack.Screen name="(app)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={!!user && isOfficer}>
+        <Stack.Screen name="(officer)" />
       </Stack.Protected>
 
       <Stack.Protected guard={!user}>
