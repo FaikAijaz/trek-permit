@@ -1,17 +1,27 @@
-# Trek Permit — Mobile (Trekker role)
+# Trek Permit — Mobile (Trekker + Field Officer roles)
 
-Expo (TypeScript) app for the trekker side of the pilot: OTP login, browsing
-open treks, creating an individual application, uploading documents,
-submitting, and viewing an issued permit's QR code.
+Expo (TypeScript) app, one binary, two roles split by login:
 
-**Not in this app yet** (see `docs/BUILD_SPEC.md`'s Week 6 plan): the Field
-Officer role, QR *scanning*, and offline signature verification. Group
-applications (member management) also aren't in the mobile UI yet, though
-the backend supports them from Week 3 onward.
+- **Trekker**: OTP login, browsing open treks, creating an individual
+  application, uploading documents, submitting, and viewing an issued
+  permit's QR code.
+- **Field Officer**: scans a permit's QR code and verifies it — signature,
+  revocation, validity window — entirely offline, against a public key and
+  revocation list synced into on-device SQLite while the phone still has
+  signal. See `../docs/BUILD_SPEC.md` Section 1 for why offline verification
+  is the defining constraint of this whole system.
+
+**Not in this app yet:** group applications (member management) in the
+Trekker UI, though the backend supports them from Week 3 onward.
+
+See the root README's "Trying the Field Officer role" section for how to
+get an officer-role account, since there's no in-app signup for one.
 
 ## Running it
 
-1. **Backend must be running** — this app talks to it over plain HTTP, there's no offline fallback for anything but the (not-yet-built) permit-verification screen.
+1. **Backend must be running** — the Trekker role talks to it for
+   everything; the Field Officer role only needs it for the Sync tab
+   (Scan works with no connection at all once synced).
 2. **Find this computer's LAN IP** (Windows: `ipconfig`, look for "IPv4 Address" under your active adapter — Wi-Fi or Ethernet).
 3. Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL` to `http://<that IP>:3000`. **Not `localhost`** — on a phone, `localhost` means the phone itself, not this computer.
 4. Your phone and this computer need to be on the **same Wi-Fi network**.
@@ -25,16 +35,25 @@ Changing `.env` requires restarting the dev server (`npx expo start --clear` if 
 ```
 app/                    expo-router file-based routes
   (auth)/                  login, OTP verify — shown when signed out
-  (app)/                   shown when signed in
+  (app)/                   shown when signed in, role = trekker
     (tabs)/                  Treks, My Applications
     applications/            new / [id] detail / [id]/upload
     permits/[id]             QR display
+  (officer)/               shown when signed in, role = officer/admin
+    (tabs)/                  Scan (camera), Sync (pull key + revocations, sign out)
+    result                   verification verdict + permit details
 src/
-  api/                   one file per backend module (auth, routes, applications, documents, permits) + a shared fetch client
+  api/                   one file per backend module (auth, routes, applications, documents,
+                          permits, verification) + a shared fetch client
+  offline/               store.ts (SQLite cache of the public key + revocation list),
+                          verifyPermit.ts (parse QR, check signature/revocation/dates — no network)
   context/AuthContext    session state, persisted via expo-secure-store
   components/            Screen, PrimaryButton, FormField, DateField, StatusBadge
   theme.ts               colors + status-color lookup
 ```
+
+`app/_layout.tsx` is where Trekker vs. Field Officer is decided — by
+`user.role`, once, right after sign-in.
 
 Each `src/api/*.ts` file mirrors one backend controller — if the backend adds
 a field or endpoint, the matching file here is where to update it.
