@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { decideParticipant, ParticipantDecision } from '@/lib/api/participants';
+import { fetchDocumentBlob } from '@/lib/api/documents';
 import { ApiError } from '@/lib/api/client';
 import { Participant, ParticipantDetail } from '@/lib/types';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -16,12 +17,14 @@ const LEGAL_DECISIONS: Partial<Record<string, ParticipantDecision[]>> = {
 };
 
 export function ParticipantCard({
+  applicationId,
   base,
   detail,
   isLeader,
   canDecide,
   onDecided,
 }: {
+  applicationId: string;
   base: Participant;
   detail: ParticipantDetail | undefined;
   isLeader: boolean;
@@ -32,8 +35,27 @@ export function ParticipantCard({
   const [remark, setRemark] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [viewingDocId, setViewingDocId] = useState<string | null>(null);
 
   const legalDecisions = LEGAL_DECISIONS[base.status] ?? [];
+
+  async function handleView(documentId: string) {
+    setError(null);
+    setViewingDocId(documentId);
+    try {
+      const blob = await fetchDocumentBlob(applicationId, base.id, documentId);
+      const url = URL.createObjectURL(blob);
+      // The new tab holds its own reference once it's opened; releasing
+      // this one a little later (not immediately) avoids revoking it out
+      // from under a slow-loading PDF viewer.
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not open this document');
+    } finally {
+      setViewingDocId(null);
+    }
+  }
 
   async function submit(decision: ParticipantDecision) {
     if (decision !== 'APPROVED' && !remark.trim()) return;
@@ -98,19 +120,25 @@ export function ParticipantCard({
         {base.documents.filter((d) => d.isCurrent).length === 0 ? (
           <p className="mt-1 text-sm text-gray-400">None uploaded yet.</p>
         ) : (
-          <ul className="mt-1 space-y-0.5 text-sm text-gray-600">
+          <ul className="mt-1 space-y-1 text-sm text-gray-600">
             {base.documents
               .filter((d) => d.isCurrent)
               .map((d) => (
-                <li key={d.id}>
-                  {d.documentType.replace(/_/g, ' ')} &mdash; {d.originalFilename} (v{d.version})
+                <li key={d.id} className="flex items-center justify-between gap-2">
+                  <span>
+                    {d.documentType.replace(/_/g, ' ')} &mdash; {d.originalFilename} (v{d.version})
+                  </span>
+                  <button
+                    onClick={() => handleView(d.id)}
+                    disabled={viewingDocId === d.id}
+                    className="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-800 disabled:text-gray-400"
+                  >
+                    {viewingDocId === d.id ? 'Opening…' : 'View'}
+                  </button>
                 </li>
               ))}
           </ul>
         )}
-        {/* No file preview/download link — the backend has no endpoint to
-            retrieve a document's bytes yet, only to upload one (see
-            PROJECT_ARCHITECTURE.md Section 27). */}
       </div>
 
       {canDecide && legalDecisions.length > 0 && (

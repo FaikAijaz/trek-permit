@@ -2,8 +2,9 @@
 
 Next.js (App Router, TypeScript, Tailwind) app for officers and admins:
 the review queue, per-participant decisions (approve / reject / request
-correction), whole-application approve/reject, permit issuance (with the
-exclusion-confirmation step), and admin-only permit revocation. See
+correction) with document viewing, whole-application approve/reject,
+permit issuance (with the exclusion-confirmation step), and admin-only
+permit revocation. See
 [`../docs/BUILD_SPEC.md`](../docs/BUILD_SPEC.md) for the full design spec
 and [`../PROJECT_ARCHITECTURE.md`](../PROJECT_ARCHITECTURE.md) for how this
 fits the rest of the system.
@@ -45,7 +46,7 @@ app/
     applications/[id]/page.tsx      the big one — application detail, participant
                                      review/decide, approve/reject, issue permit,
                                      admin revoke
-    applications/[id]/ParticipantCard.tsx   one participant's card + decision form
+    applications/[id]/ParticipantCard.tsx   one participant's card + decision form + document "View" links
 lib/
   types.ts                 hand-mirrored backend types (same caveat as mobile/src/api/types.ts —
                             no shared package, keep this in sync by hand)
@@ -53,13 +54,15 @@ lib/
                             sent as Authorization header, same posture as the mobile app —
                             not an httpOnly cookie; see the file's own comment on that trade-off)
   api/                      one file per backend module + a shared fetch client
+                            (client.ts's apiRequestBlob() is the one non-JSON exception,
+                            used by api/documents.ts to fetch a document's bytes)
   theme.ts                  status → Tailwind class lookup
 components/
   RequireStaff.tsx           the auth/role guard every (dashboard) page sits behind
   StatusBadge.tsx, Button.tsx, TopNav.tsx, QrCode.tsx
 ```
 
-A known gap, inherited from the backend rather than introduced here:
-there's no document-download endpoint, so a document shows as a filename
-and version on the participant card, with no way to actually view its
-contents. See `PROJECT_ARCHITECTURE.md` Section 27.
+Clicking "View" on a document fetches it with the bearer token attached
+(a plain `<a href>` to the backend can't do that), turns the response into
+a `blob:` URL, and opens that in a new tab — `ParticipantCard.tsx`'s
+`handleView()`.

@@ -1,5 +1,5 @@
 import { extname } from 'node:path';
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Document, DocumentType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -88,5 +88,50 @@ export class DocumentsService {
     }
 
     return document;
+  }
+
+  /**
+   * The other half of upload(): reads a document's bytes back for viewing.
+   * Unlike upload — gated to draft/correction windows — a document can be
+   * viewed any time by whoever could see it at all: the application's
+   * owner, or staff. There's no "is this still editable" question here,
+   * only "does this person get to look at it".
+   */
+  async getFile(
+    applicationId: string,
+    participantId: string,
+    documentId: string,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      include: { participant: { include: { application: true } } },
+    });
+
+    if (
+      !document ||
+      document.participantId !== participantId ||
+      document.participant.applicationId !== applicationId
+    ) {
+      throw new NotFoundException(
+        `No document with id ${documentId} on this participant`,
+      );
+    }
+
+    const isOwner =
+      document.participant.application.applicantUserId === requestingUserId;
+    const isStaff =
+      requestingUserRole === 'officer' || requestingUserRole === 'admin';
+    if (!isOwner && !isStaff) {
+      throw new ForbiddenException('This document does not belong to you');
+    }
+
+    const buffer = await this.storageService.read(document.storageKey);
+    return {
+      buffer,
+      mimeType: document.mimeType,
+      filename: document.originalFilename,
+    };
   }
 }

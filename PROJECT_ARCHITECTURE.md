@@ -209,7 +209,7 @@ trek-permit/
 | `src/applications/applications.service.ts` | All business rules for creating/editing/submitting applications and the whole-application approve/reject decision | `ApplicationsController`, `DocumentsService` | `PrismaService`, `AuditService`, `ReferenceService` | `create`, `submit`, `approve`, `reject`, `addParticipant`, `updateParticipant`, `removeParticipant`, `getApplicationForDocumentUpload` |
 | `src/participants/participants.controller.ts` | The officer's per-person review UI's backend: `GET /participants/:id`, `PATCH /participants/:id/decision` | `dashboard/lib/api/participants.ts` (see the dashboard addendum above) | `ParticipantsService` | `findOne`, `decide` |
 | `src/participants/participants.service.ts` | The **only** place `participants.status` is ever written (comment states this explicitly); enforces the legal state-transition table; surfaces prior rejections | `ParticipantsController` | `PrismaService`, `AuditService` | `findForReview()`, `decide()` |
-| `src/documents/documents.controller.ts` | `POST` a document file for a participant | Mobile `src/api/documents.ts` | `DocumentsService` | `upload()` |
+| `src/documents/documents.controller.ts` | `POST` a document file for a participant, `GET` one back (view, not download-forcing — `Content-Disposition: inline`) | Mobile `src/api/documents.ts` (upload only); `dashboard/lib/api/documents.ts` (view only) | `DocumentsService` | `upload()`, `download()` |
 | `src/documents/documents.service.ts` | Versions a document (never overwrites), triggers `CORRECTION_REQUESTED → PENDING` on a corrective re-upload | `DocumentsController` | `ApplicationsService`, `StorageService`, `PrismaService`, `AuditService` | `upload()` |
 | `src/documents/storage.service.ts` | Writes a file to local disk under `STORAGE_LOCAL_PATH` | `DocumentsService` | Node `fs/promises` | `save()` |
 
@@ -465,7 +465,14 @@ POST  (multipart/form-data: documentType, file)
     `<participantId>/<documentType>_v<n><ext>`, marks the old one isCurrent:false,
     creates the new row as isCurrent:true.
   ↓ if this was a correction: participant.status → PENDING, resubmitted: true.
-  No GET/download endpoint exists anywhere for documents — see Section 27.
+
+GET /:documentId   [JwtAuthGuard, owner-or-staff]
+  Reads the file back via StorageService.read(document.storageKey), returned as a
+  StreamableFile with Content-Type set from the stored mimeType and
+  Content-Disposition: inline (not attachment — the dashboard opens it in a new
+  tab, not a download prompt). Unlike upload, not gated to a draft/correction
+  window — viewing has no "is this still editable" question, only "does this
+  person get to see it" (owner or officer/admin).
 ```
 
 ### Permits
@@ -1335,7 +1342,7 @@ Check:
 | Change OTP behavior (length, expiry, attempts) | `backend/src/auth/otp.service.ts` | `.env` values (`OTP_*`), `backend/.env.example` for defaults |
 | Add a real SMS provider | `backend/src/auth/sms.service.ts` `sendOtp()` — replace the `throw` branch | `.env` `SMS_API_KEY`, whatever provider SDK you add to `package.json` |
 | Add real cloud storage | `backend/src/documents/storage.service.ts` `save()` | `.env` `S3_*` vars already exist as placeholders |
-| Add a document-download endpoint | `backend/src/documents/documents.controller.ts` (currently POST-only) | `storage.service.ts` (needs a matching `read()`), authorization rules — decide who may view a document |
+| Change how a document is viewed/downloaded | `backend/src/documents/documents.controller.ts` `download()` | `storage.service.ts`'s `read()`; `dashboard/lib/api/documents.ts` + `ParticipantCard.tsx`'s `handleView()` on the client side |
 | Change what an officer can/can't approve | `backend/src/applications/applications.service.ts` `approve()`, `backend/src/participants/participants.service.ts` `LEGAL_DECISIONS` | `docs/BUILD_SPEC.md` Section 2 & 3 for the rules these encode |
 | Change the permit QR payload shape | `backend/src/permits/permits.service.ts` `PermitPayload` interface + `issue()` | `mobile/src/api/types.ts` `PermitPayload` (must mirror it by hand), `mobile/src/offline/verifyPermit.ts` (parses it), the `v` schema-version field if the shape changes in an incompatible way |
 | Change which roles can do what | The route's `@Roles(...)` decorator in the relevant `*.controller.ts` | `backend/src/common/guards/roles.guard.ts` if the ROLE CHECK logic itself needs to change |
@@ -1461,7 +1468,7 @@ If you only remember 10 things about this codebase, remember these:
 
 ## 27. Unknowns / Things That Could Not Be Confirmed
 
-- **Why is there no document-download/view endpoint?** `documents.controller.ts` only has `POST`. Whether this is an intentional scope cut for the pilot (officers view documents some other way not in this repo) or a genuine gap could not be determined from the code.
+- ~~Why is there no document-download/view endpoint?~~ — resolved: `documents.controller.ts` now has a `GET :documentId` alongside `POST`, and the dashboard's participant cards have a "View" link per document that opens it in a new tab via a blob URL.
 - **Why does the mobile app auto-create OTP-verified users as `trekker` only, with no self-serve way to become `officer`?** The seed script (`backend/prisma/seed.ts`) does create one ready-made officer (`9999999998`) and one admin (`9999999999`) account for the pilot — but there is no API endpoint anywhere that promotes a user's role, and no documentation of how additional officer accounts are meant to be provisioned in a real deployment. Likely intended to be a manual/database-level admin action for a small pilot, but this isn't stated anywhere.
 - **Whether `SMS_PROVIDER=msg91`/`twilio` and `STORAGE_PROVIDER=s3` are actually planned for a later phase, or were sketched in `.env.example` and then deliberately deferred**, could not be confirmed — `docs/BUILD_SPEC.md` mentions them as the eventual real values but doesn't commit to a timeline.
 - ~~Whether the Next.js department dashboard is still planned~~ — resolved: it now exists (`dashboard/`, added in a later pass than this document's original survey). What's still unconfirmed: whether its current scope (review queue, decisions, issuance, revocation) is the department's full intended feature set, or whether further screens (route management, audit log viewing, notifications) are still expected — nothing in `docs/BUILD_SPEC.md` specifies the dashboard's scope beyond "application list, member-by-member review, corrections, prior-rejection flag."

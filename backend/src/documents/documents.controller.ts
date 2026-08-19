@@ -2,15 +2,19 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Param,
   ParseUUIDPipe,
   Post,
+  Res,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Document } from '@prisma/client';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/types/jwt-payload.type';
@@ -58,5 +62,32 @@ export class DocumentsController {
       file,
       user.sub,
     );
+  }
+
+  // Owner or staff, same rule findOneForUser uses elsewhere — see
+  // documents.service.ts's getFile() for why this isn't gated to the
+  // draft/correction window the way upload() is.
+  @Get(':documentId')
+  async download(
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('participantId', ParseUUIDPipe) participantId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @CurrentUser() user: JwtPayload,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, mimeType, filename } = await this.documentsService.getFile(
+      applicationId,
+      participantId,
+      documentId,
+      user.sub,
+      user.role,
+    );
+    // "inline", not "attachment" — the dashboard opens this in a new tab to
+    // display it, not to trigger a download prompt.
+    res.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+    });
+    return new StreamableFile(buffer);
   }
 }

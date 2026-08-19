@@ -203,6 +203,7 @@ export default function ApplicationDetailPage({
         {application.participants.map((p) => (
           <ParticipantCard
             key={p.id}
+            applicationId={id}
             base={p}
             detail={participantDetails[p.id]}
             isLeader={p.isLeader}

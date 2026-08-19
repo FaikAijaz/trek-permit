@@ -77,6 +77,31 @@ export async function apiRequest<T>(
   return data as T;
 }
 
-/** Multipart upload isn't needed by the dashboard today (there's no
- * document-upload or -download screen — see PROJECT_ARCHITECTURE.md's
- * "no document GET endpoint" gap) — apiRequest deliberately stays JSON-only. */
+/** Multipart upload isn't needed by the dashboard — there's no upload
+ * screen here — but viewing an already-uploaded document is, so
+ * apiRequest's JSON-only assumption doesn't cover that one case.
+ * apiRequestBlob() is the same auth/error handling, for a binary response. */
+export async function apiRequestBlob(path: string): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(`${API_URL}${path}`, { headers });
+
+  if (!response.ok) {
+    // Error responses are still JSON (Nest's default exception filter) —
+    // read it as text->JSON.parse rather than assuming a body shape ahead
+    // of time, since a genuine file response should never be parsed as JSON.
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const parsed = JSON.parse(await response.text()) as { message?: string };
+      if (parsed.message) message = parsed.message;
+    } catch {
+      // body wasn't JSON — keep the generic message
+    }
+    throw new ApiError(message, response.status);
+  }
+
+  return response.blob();
+}
