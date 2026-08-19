@@ -38,7 +38,7 @@ Nothing in this document is invented. Where something couldn't be determined, [S
 | Backend | NestJS 11 (TypeScript), running on Node.js |
 | Database | PostgreSQL, accessed through Prisma 7 |
 | Mobile | Expo SDK 57 / React Native 0.86 / React 19, TypeScript |
-| Department dashboard | **Not built** — see [Section 27](#27-unknowns--things-that-could-not-be-confirmed) |
+| Department dashboard | Next.js (App Router, TypeScript, Tailwind) — `dashboard/`. Officer/admin login, review queue, participant decisions, application approve/reject, permit issuance, admin-only revocation. Added after this document's first pass — see `dashboard/README.md` |
 | Authentication | Custom OTP-over-SMS + JWT (no third-party auth provider) |
 | External services | None actually wired up — SMS and cloud storage are both stubbed to "not implemented" outside of local/console dev modes (see [Section 13](#13-external-services)) |
 | Deployment/runtime | Local development only, confirmed from code — no Dockerfile, CI config, or deployment script exists in the repository |
@@ -96,7 +96,10 @@ Meanwhile, entirely offline at a checkpoint:
 | `@react-native-community/datetimepicker` | Date pickers on the application form | `mobile/src/components/DateField.tsx` |
 | Jest / `ts-jest` / Supertest | Backend testing | `backend/package.json`; only the default NestJS boilerplate tests exist today — see [Section 20](#20-testing-strategy) |
 
-No frontend framework (React, Vue, Next.js) is present for a web dashboard, despite `docs/BUILD_SPEC.md` describing one as a required third part of the system.
+A Next.js dashboard now exists (`dashboard/`, added after this document's initial pass) — see [Section 2's addendum](#dashboard-addition) below and `dashboard/README.md` for its own structure; the rest of this document otherwise describes the state as first surveyed (backend + mobile only) unless a note says otherwise.
+
+<a id="dashboard-addition"></a>
+**Dashboard addendum.** `dashboard/` is a Next.js 16 App Router app (TypeScript, Tailwind CSS) that reuses the backend's existing OTP+JWT auth (rejecting a `trekker` account client-side, since every dashboard endpoint would 403 it anyway) and gives officers/admins a real UI for everything Sections 7 and 16 above describe as "no mobile/dashboard UI exists for this yet": the review queue (`GET /applications`), per-participant decisions (`GET`/`PATCH /participants/:id...`), whole-application approve/reject, permit issuance with the exclusion-confirmation flow, and admin-only revocation. It required one backend change — `app.enableCors()` in `main.ts` — since a browser enforces CORS the way React Native's `fetch` never did. It's a client-rendered app throughout (every page is `'use client'`): data is fetched with plain `fetch` in `useEffect`, not a server-rendering data-fetching pattern, matching the mobile app's own "no data-fetching library" approach. Auth token storage mirrors the mobile app's posture too — a bearer token in `localStorage`, not an httpOnly cookie (see `dashboard/lib/auth-context.tsx`'s comment on that trade-off). The rest of this document's "no dashboard exists" statements below are now historical — read them as "no UI existed at the time of the original survey," not as current fact.
 
 ---
 
@@ -138,6 +141,17 @@ trek-permit/
 │       ├── context/AuthContext.tsx session state, persisted via expo-secure-store
 │       ├── components/             5 shared UI primitives
 │       └── theme.ts                colors + status-color lookup
+│
+├── dashboard/                   Next.js app — officer/admin review, approval, permit issuance, revocation
+│   ├── app/
+│   │   ├── layout.tsx               wraps everything in AuthProvider
+│   │   ├── page.tsx                 redirects to /login or /applications by auth state
+│   │   ├── login/                   two-step mobile → OTP form
+│   │   └── (dashboard)/             route group: RequireStaff guard + TopNav
+│   │       └── applications/        the queue, and applications/[id] — the review/decide/issue/revoke screen
+│   ├── lib/                         types.ts (hand-mirrored, same caveat as mobile), auth-context.tsx,
+│   │                                 api/ (one file per backend module), theme.ts
+│   └── components/                  RequireStaff, StatusBadge, Button, TopNav, QrCode
 │
 └── docs/
     └── BUILD_SPEC.md            the design spec this whole project was built from — read this for *why*, this document for *what/where*
@@ -193,7 +207,7 @@ trek-permit/
 | `src/routes/routes.controller.ts` + `.service.ts` | CRUD for `TrekRoute`; public read, officer/admin write | Mobile `src/api/routes.ts` | `PrismaService`, `AuditService` | `findAll`, `findOne`, `create`, `update`, `remove` |
 | `src/applications/applications.controller.ts` | Every application/participant route the applicant themselves calls, plus officer approve/reject | Mobile `src/api/applications.ts`, `src/api/documents.ts` (indirectly, via the service) | `ApplicationsService` | see route table below |
 | `src/applications/applications.service.ts` | All business rules for creating/editing/submitting applications and the whole-application approve/reject decision | `ApplicationsController`, `DocumentsService` | `PrismaService`, `AuditService`, `ReferenceService` | `create`, `submit`, `approve`, `reject`, `addParticipant`, `updateParticipant`, `removeParticipant`, `getApplicationForDocumentUpload` |
-| `src/participants/participants.controller.ts` | The officer's per-person review UI's backend: `GET /participants/:id`, `PATCH /participants/:id/decision` | — (officer-only, no mobile client calls this yet — dashboard doesn't exist) | `ParticipantsService` | `findOne`, `decide` |
+| `src/participants/participants.controller.ts` | The officer's per-person review UI's backend: `GET /participants/:id`, `PATCH /participants/:id/decision` | `dashboard/lib/api/participants.ts` (see the dashboard addendum above) | `ParticipantsService` | `findOne`, `decide` |
 | `src/participants/participants.service.ts` | The **only** place `participants.status` is ever written (comment states this explicitly); enforces the legal state-transition table; surfaces prior rejections | `ParticipantsController` | `PrismaService`, `AuditService` | `findForReview()`, `decide()` |
 | `src/documents/documents.controller.ts` | `POST` a document file for a participant | Mobile `src/api/documents.ts` | `DocumentsService` | `upload()` |
 | `src/documents/documents.service.ts` | Versions a document (never overwrites), triggers `CORRECTION_REQUESTED → PENDING` on a corrective re-upload | `DocumentsController` | `ApplicationsService`, `StorageService`, `PrismaService`, `AuditService` | `upload()` |
@@ -203,7 +217,7 @@ trek-permit/
 
 | File | Purpose | Called/Imported By | Calls/Imports | Important Functions |
 |---|---|---|---|---|
-| `src/permits/application-permit.controller.ts` | `POST /applications/:applicationId/permit` — issue a permit | — (no mobile client calls this; officers/admins would need the dashboard, which doesn't exist) | `PermitsService` | `issue()` |
+| `src/permits/application-permit.controller.ts` | `POST /applications/:applicationId/permit` — issue a permit | `dashboard/lib/api/permits.ts` (see the dashboard addendum above) | `PermitsService` | `issue()` |
 | `src/permits/permits.controller.ts` | `GET /permits/public-key`, `GET /permits/revocations`, `GET /permits/:id`, `POST /permits/:id/revoke` | Mobile `src/api/permits.ts` (`GET /permits/:id` only), `src/api/verification.ts` (public-key, revocations) | `PermitsService` | `getPublicKey`, `listRevocations`, `findOne`, `revoke` |
 | `src/permits/permits.service.ts` | Builds and signs the permit payload; revocation logic that cascades to participants | Both permit controllers | `PrismaService`, `AuditService`, `ReferenceService`, `SigningService` | `issue()`, `getPublicKey()`, `listRevocations()`, `findOneForUser()`, `revoke()` |
 | `src/permits/signing.service.ts` | Loads the Ed25519 keypair from env; signs/verifies; exports the raw public key as hex for the mobile app | `PermitsService` | Node `node:crypto` | `sign()`, `verify()`, `getPublicKeyHex()` |
@@ -600,8 +614,7 @@ erDiagram
 **Tracing one object end to end — the permit payload:**
 
 ```text
-Officer taps "Issue Permit" (would be a dashboard action — dashboard doesn't exist yet;
-today this is only reachable by calling the API directly)
+Officer taps "Issue permit" on the dashboard (dashboard/app/(dashboard)/applications/[id]/page.tsx)
         ↓
 POST /applications/:id/permit
         ↓
@@ -889,29 +902,43 @@ Covered in full in [Section 8](#8-frontend-flow-mobile-app)'s flowchart.
 
 ### Scenario: Officer reviews and decides a participant
 ```text
-(No mobile/dashboard UI exists for this today — it must be called directly against
-the API. This is the single biggest functional gap in the current build; see Section 27.)
-
-GET /participants/:id  → officer sees documents + prior rejections
+Dashboard: officer opens an application from the queue
       ↓
-PATCH /participants/:id/decision  { decision: 'APPROVED' }
+GET /applications/:id, GET /routes/:id, GET /participants/:id for each participant
+  → dashboard shows documents + prior rejections per participant
+      ↓
+Officer clicks Approve / Reject / Request correction on a participant's card
+  (Reject/Request correction opens a remark textarea first — remark is required)
+      ↓
+PATCH /participants/:id/decision  { decision, remark? }
       ↓
 If this was the first decision on a submitted application → application → under_review
 ```
-Files: `backend/src/participants/*`.
+Files: `dashboard/app/(dashboard)/applications/[id]/ParticipantCard.tsx`,
+`dashboard/lib/api/participants.ts`, `backend/src/participants/*`.
 
 ### Scenario: Officer approves the application and issues a permit
 ```text
-POST /applications/:id/approve   (requires leader APPROVED + ≥1 participant APPROVED)
+Dashboard: "Approve application" button (enabled once leader + ≥1 participant APPROVED)
+      ↓
+POST /applications/:id/approve
+      ↓
+"Issue permit" button appears
       ↓
 POST /applications/:id/permit
       ↓
-If some participants are still unresolved: 409 first, listing them — officer must
-resend with confirmExclusions: true to proceed and have them auto-EXCLUDED.
+If some participants are still unresolved: 409 first — the dashboard renders them and
+switches to an "Issue anyway" button, which resends with confirmExclusions: true.
       ↓
 Permit created, signed, QR payload built. Application → permit_issued.
+      ↓
+Dashboard renders the QR (dashboard/components/QrCode.tsx, client-side via the
+`qrcode` package) plus the reference and validity dates.
 ```
-Files: `backend/src/applications/applications.service.ts` (`approve`), `backend/src/permits/permits.service.ts` (`issue`).
+Files: `dashboard/app/(dashboard)/applications/[id]/page.tsx`,
+`dashboard/lib/api/applications.ts` + `permits.ts`,
+`backend/src/applications/applications.service.ts` (`approve`),
+`backend/src/permits/permits.service.ts` (`issue`).
 
 ### Scenario: Trekker views their issued permit
 ```text
@@ -940,6 +967,12 @@ Files: `mobile/app/(officer)/(tabs)/scan.tsx`, `sync.tsx`, `mobile/app/(officer)
 
 ### Scenario: Admin revokes a permit
 ```text
+Dashboard: "Revoke permit" button (only rendered for a signed-in admin — an officer
+sees "Revoking a permit is admin-only" instead; the backend's RolesGuard is the
+real enforcement either way)
+      ↓
+Reason textarea → "Confirm revocation"
+      ↓
 POST /permits/:id/revoke   { reason }
       ↓ admin-only — an officer token gets 403 here even though officers can do
         almost everything else staff-related
@@ -949,7 +982,8 @@ participant on that application → REVOKED
 Next time any Field Officer's phone syncs, GET /permits/revocations will include
 this permit's reference, and any future scan of it will read REVOKED
 ```
-Files: `backend/src/permits/permits.service.ts` (`revoke`).
+Files: `dashboard/app/(dashboard)/applications/[id]/page.tsx`,
+`dashboard/lib/api/permits.ts`, `backend/src/permits/permits.service.ts` (`revoke`).
 
 ---
 
@@ -969,7 +1003,8 @@ Scenario: Officer issues a permit while some group members are unresolved
 What happens: PermitsService.issue() refuses on the first attempt.
 Current behavior: 409 Conflict listing the unresolved participants; requires an
   explicit confirmExclusions: true resend.
-Frontend behavior: N/A — no mobile/dashboard UI calls this endpoint today.
+Frontend behavior: the dashboard catches the 409's `unresolved` array (ApiError.unresolved)
+  and renders each name + status, switching the button to "Issue anyway".
 ```
 
 ```text
@@ -1110,7 +1145,7 @@ c563dfa  Week 6: Field Officer role -- QR scan, offline signature verification v
 9ff57a0  docs: root README with full setup instructions, refresh backend/mobile READMEs
 ```
 
-Notably, Week 4's actual content (officer review/approval backend logic) differs from `docs/BUILD_SPEC.md`'s original Week 4 plan ("Dashboard: application list, member-by-member review...") — the backend endpoints were built, but the dashboard itself was not, and still doesn't exist (see [Section 27](#27-unknowns--things-that-could-not-be-confirmed)).
+Notably, Week 4's actual content (officer review/approval backend logic) differs from `docs/BUILD_SPEC.md`'s original Week 4 plan ("Dashboard: application list, member-by-member review...") — the backend endpoints were built first, with the dashboard itself following later (see the [dashboard addendum](#dashboard-addition) above), rather than in the same week the spec originally proposed.
 
 No deprecated code, no duplicate implementations of the same feature, and no commented-out code blocks were found anywhere in either `backend/src` or `mobile/`.
 
@@ -1307,7 +1342,7 @@ Check:
 | Change the Trekker mobile UI | The relevant screen under `mobile/app/(app)/` | The matching `mobile/src/api/*.ts` file if the request/response shape is involved |
 | Change the Field Officer offline verification logic | `mobile/src/offline/verifyPermit.ts` | `mobile/src/offline/store.ts` if the cached data shape changes too |
 | Add group-member management to the mobile Trekker UI | `mobile/app/(app)/applications/new.tsx` and `[id]/index.tsx` (currently individual-only) | `backend/src/applications/applications.controller.ts` `addParticipant`/`updateParticipant`/`removeParticipant` — the backend already supports this |
-| Add the Next.js department dashboard | Doesn't exist yet — would be a new top-level `dashboard/` folder | Every "officer" backend endpoint already exists and is ready to be called: `participants.controller.ts`, `applications.controller.ts` (approve/reject), `application-permit.controller.ts` (issue) |
+| Change the department dashboard | `dashboard/app/(dashboard)/applications/` — the review queue and detail/decision/issue/revoke screens | `dashboard/lib/api/*.ts` if the request/response shape is involved; `dashboard/README.md` |
 | Change global rate limits | `backend/src/app.module.ts` `ThrottlerModule.forRoot(...)` | Per-route `@Throttle(...)` overrides, e.g. on `auth.controller.ts`'s OTP-request route |
 | Change JWT session length | `.env` `JWT_EXPIRES_IN` | `backend/src/auth/auth.module.ts` for the default fallback value |
 
@@ -1333,17 +1368,18 @@ TREK PERMIT
 │   ├── Upload documents (versioned) (backend/src/documents, mobile upload.tsx)
 │   └── Submit
 │
-├── Applications — officer side (backend/src/applications, backend/src/participants)
-│   │   (no mobile/dashboard UI exists for any of this yet)
+├── Applications — officer side (backend/src/applications, backend/src/participants,
+│   │   dashboard/app/(dashboard)/applications)
 │   ├── Per-participant decision (approve/reject/request correction)
 │   ├── Prior-rejection lookup (informational)
 │   ├── Whole-application approve
 │   └── Whole-application reject
 │
-├── Permits (backend/src/permits, mobile/app/(app)/permits/[id].tsx)
-│   ├── Issue (Ed25519 sign, build QR payload) — backend only, no UI trigger yet
-│   ├── View (trekker, via QR)
-│   └── Revoke (admin only) — backend only, no UI trigger yet
+├── Permits (backend/src/permits, mobile/app/(app)/permits/[id].tsx,
+│   │   dashboard/app/(dashboard)/applications/[id])
+│   ├── Issue (Ed25519 sign, build QR payload) — dashboard-triggered
+│   ├── View (trekker, via QR; also shown on the dashboard after issuance)
+│   └── Revoke (admin only) — dashboard-triggered
 │
 ├── Field Officer offline verification (mobile/app/(officer), mobile/src/offline)
 │   ├── Sync public key + revocation list (the only online moment)
@@ -1418,7 +1454,7 @@ If you only remember 10 things about this codebase, remember these:
 6. **A user's role is baked into their JWT at login time.** Changing `users.role` in the database does nothing until that user signs in again.
 7. **The mobile app and backend share no code or types.** `mobile/src/api/types.ts` is a hand-maintained mirror — if you change a backend response shape, you must remember to update it yourself.
 8. **SMS and cloud storage are not really implemented** — only `console` (log the OTP) and `local` (write to disk) work. Anything else throws immediately.
-9. **There is no officer-facing dashboard.** Every officer/admin action documented here (review, approve, issue, revoke) is a real, working backend endpoint with no UI in front of it yet.
+9. **There is now an officer-facing dashboard** (`dashboard/`, Next.js). Every officer/admin action documented here — review, approve, issue, revoke — has a real UI in front of it there, not just a backend endpoint.
 10. **The mobile app splits into two completely different apps by role, decided once, at `app/_layout.tsx`.** A trekker never sees the officer UI, and vice versa — there's no toggle, just the JWT's `role` claim.
 
 ---
@@ -1428,7 +1464,7 @@ If you only remember 10 things about this codebase, remember these:
 - **Why is there no document-download/view endpoint?** `documents.controller.ts` only has `POST`. Whether this is an intentional scope cut for the pilot (officers view documents some other way not in this repo) or a genuine gap could not be determined from the code.
 - **Why does the mobile app auto-create OTP-verified users as `trekker` only, with no self-serve way to become `officer`?** The seed script (`backend/prisma/seed.ts`) does create one ready-made officer (`9999999998`) and one admin (`9999999999`) account for the pilot — but there is no API endpoint anywhere that promotes a user's role, and no documentation of how additional officer accounts are meant to be provisioned in a real deployment. Likely intended to be a manual/database-level admin action for a small pilot, but this isn't stated anywhere.
 - **Whether `SMS_PROVIDER=msg91`/`twilio` and `STORAGE_PROVIDER=s3` are actually planned for a later phase, or were sketched in `.env.example` and then deliberately deferred**, could not be confirmed — `docs/BUILD_SPEC.md` mentions them as the eventual real values but doesn't commit to a timeline.
-- **Whether the Next.js department dashboard (`docs/BUILD_SPEC.md`'s third listed part of the system) is still planned, paused, or intentionally replaced by direct API access for this pilot** could not be determined from the repository alone — no `dashboard/` folder, no related commit, no note explaining the omission exists in the code or commit history checked.
+- ~~Whether the Next.js department dashboard is still planned~~ — resolved: it now exists (`dashboard/`, added in a later pass than this document's original survey). What's still unconfirmed: whether its current scope (review queue, decisions, issuance, revocation) is the department's full intended feature set, or whether further screens (route management, audit log viewing, notifications) are still expected — nothing in `docs/BUILD_SPEC.md` specifies the dashboard's scope beyond "application list, member-by-member review, corrections, prior-rejection flag."
 - **Production infrastructure** (hosting, CI/CD, process management, database backups, TLS termination) is entirely outside this repository — no Dockerfile, no CI workflow file, no infrastructure-as-code of any kind exists to inspect.
 - **Whether the "group" application type has ever been exercised through the mobile app** — the backend has supported it since Week 3 (per commit history), but no mobile screen constructs a `type: 'group'` request; `mobile/src/api/applications.ts` hardcodes `type: 'individual'`. Whether group support was tested via direct API calls during development could not be confirmed from the repository.
 - **The exact production deployment target implied by `docs/BUILD_SPEC.md`'s "future infrastructure migration is a configuration change" line** — no specific cloud provider, container setup, or hosting plan is referenced anywhere in code or config.

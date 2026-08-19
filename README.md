@@ -13,7 +13,7 @@ Three parts, in one plain repo (no monorepo tooling):
 |---|---|---|
 | Backend API (NestJS + PostgreSQL) | [`backend/`](backend) | Auth, applications (individual + group), officer review, permit signing/issuance/revocation |
 | Mobile app — Trekker + Field Officer roles (Expo/React Native, one binary) | [`mobile/`](mobile) | Trekker: auth, treks, applications, document upload, permit QR. Field Officer: QR scan, fully offline signature verification |
-| Department dashboard (Next.js) | `dashboard/` | Not started — officer review currently happens via the backend API directly |
+| Department dashboard (Next.js) | [`dashboard/`](dashboard) | Officer/admin login, review queue, per-participant decisions, application approve/reject, permit issuance, admin-only revocation |
 
 ## Prerequisites
 
@@ -90,20 +90,35 @@ npm start
 Scan the QR code with Expo Go. See [`mobile/README.md`](mobile/README.md)
 for the app's structure.
 
-**Trying the Field Officer role:** every new mobile number signs in as a
-`trekker` by default — there's no signup flow for officers yet. To test the
-Field Officer side, sign in once (creating the user), then promote that
-account directly in the database:
+**Trying the Field Officer role:** every *new* mobile number signs in as a
+`trekker` by default — there's no self-serve signup flow for officers.
+`backend/prisma/seed.ts` already creates one ready-made pilot account of
+each: **officer `9999999998`**, **admin `9999999999`**. Sign in with either
+on the mobile app to land in the Field Officer UI. (To promote a
+*different* number yourself: `UPDATE users SET role = 'officer' WHERE
+mobile = '...';` directly in the database, then sign out and back in on
+the phone — the role is only read at login, so an already-issued token
+keeps the old role until then.) Once signed in as an officer, sync from
+the **Sync** tab (this needs a live connection, on purpose — it's the one
+moment the officer side talks to the server) before scanning permit QR
+codes on the **Scan** tab, which works with no connection at all.
 
-```sql
-UPDATE users SET role = 'officer' WHERE mobile = '<the mobile number you signed in with>';
+### 4. Dashboard
+
+```bash
+cd dashboard
+npm install
+cp .env.local.example .env.local
+npm run dev   # http://localhost:3001 — not 3000, so it doesn't collide with the backend
 ```
 
-Sign out and back in on the phone afterward — the role is only read at
-login. Once signed in as an officer, sync from the **Sync** tab (this needs
-a live connection, on purpose — it's the one moment the officer side talks
-to the server) before scanning permit QR codes on the **Scan** tab, which
-works with no connection at all.
+Sign in with the same seeded officer (`9999999998`) or admin (`9999999999`)
+account from step 3 above — the dashboard rejects a `trekker` account at
+login. See [`dashboard/README.md`](dashboard/README.md) for its structure.
+
+**The backend needs `app.enableCors()`** (already set in
+`backend/src/main.ts`) for the dashboard to reach it — a browser enforces
+CORS the way the mobile app's React Native `fetch` never did.
 
 ## Repository layout
 
@@ -111,7 +126,7 @@ works with no connection at all.
 trek-permit/
 ├── backend/     NestJS API — see backend/README.md
 ├── mobile/      Expo app (Trekker + Field Officer) — see mobile/README.md
-├── dashboard/   Next.js department dashboard — not started
+├── dashboard/   Next.js department dashboard — see dashboard/README.md
 └── docs/
     └── BUILD_SPEC.md   full design spec, confirmed decisions, week-by-week plan
 ```
