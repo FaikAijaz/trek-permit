@@ -81,6 +81,7 @@ export default function ApplicationsScreen() {
             </Text>
             <Text style={{ color: colors.muted, marginTop: 2, marginBottom: 10 }}>
               {item.startDate.slice(0, 10)} → {item.endDate.slice(0, 10)}
+              {item.type === 'group' ? ` · ${item.groupType} group` : ''}
             </Text>
             <StatusBadge status={item.status} />
           </Pressable>

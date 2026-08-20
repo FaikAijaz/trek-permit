@@ -2,8 +2,9 @@
 
 Expo (TypeScript) app, one binary, two roles split by login:
 
-- **Trekker**: OTP login, browsing open treks, creating an individual
-  application, uploading documents, submitting, and viewing an issued
+- **Trekker**: OTP login, browsing open treks, creating an individual or
+  group (private/commercial) application, adding/removing group members,
+  uploading documents per participant, submitting, and viewing an issued
   permit's QR code.
 - **Field Officer**: scans a permit's QR code and verifies it — signature,
   revocation, validity window — entirely offline, against a public key and
@@ -11,8 +12,9 @@ Expo (TypeScript) app, one binary, two roles split by login:
   signal. See `../docs/BUILD_SPEC.md` Section 1 for why offline verification
   is the defining constraint of this whole system.
 
-**Not in this app yet:** group applications (member management) in the
-Trekker UI, though the backend supports them from Week 3 onward.
+Group applications (individual/private/commercial, adding and removing
+members, a per-guide registration number) are supported end to end in the
+Trekker UI now, not just the backend.
 
 See the root README's "Trying the Field Officer role" section for how to
 get an officer-role account, since there's no in-app signup for one.
@@ -37,7 +39,7 @@ app/                    expo-router file-based routes
   (auth)/                  login, OTP verify — shown when signed out
   (app)/                   shown when signed in, role = trekker
     (tabs)/                  Treks, My Applications
-    applications/            new / [id] detail / [id]/upload
+    applications/            new / [id] detail / [id]/add-member / [id]/upload
     permits/[id]             QR display
   (officer)/               shown when signed in, role = officer/admin
     (tabs)/                  Scan (camera), Sync (pull key + revocations, sign out)
@@ -48,7 +50,9 @@ src/
   offline/               store.ts (SQLite cache of the public key + revocation list),
                           verifyPermit.ts (parse QR, check signature/revocation/dates — no network)
   context/AuthContext    session state, persisted via expo-secure-store
-  components/            Screen, PrimaryButton, FormField, DateField, StatusBadge
+  components/            Screen, PrimaryButton, FormField, DateField, StatusBadge,
+                          ParticipantForm (shared by the leader form and add-member —
+                          one DTO on the backend, one form here)
   theme.ts               colors + status-color lookup
 ```
 

@@ -67,6 +67,7 @@ export interface Participant {
   isLeader: boolean;
   fullName: string;
   identityNumber: string;
+  identityLast4: string;
   dateOfBirth: string | null;
   gender: 'male' | 'female' | 'other' | null;
   address: string | null;
@@ -74,6 +75,8 @@ export interface Participant {
   emergencyContactName: string | null;
   emergencyContactMobile: string | null;
   medicalDeclaration: boolean;
+  isGuide: boolean;
+  guideRegistrationNo: string | null;
   status: ParticipantStatus;
   officerRemark: string | null;
   resubmitted: boolean;
@@ -109,15 +112,21 @@ export interface PermitPayload {
   iat: string;
 }
 
+export type GroupType = 'private' | 'commercial';
+
 export interface Application {
   id: string;
   reference: string;
   type: 'individual' | 'group';
+  groupType: GroupType | null;
   trekRouteId: string;
   startDate: string;
   endDate: string;
   status: ApplicationStatus;
   rejectionReason: string | null;
+  operatorName: string | null;
+  operatorRegistrationNo: string | null;
+  operatorRegValidUntil: string | null;
   participants: Participant[];
   permits?: Permit[];
 }

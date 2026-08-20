@@ -11,6 +11,10 @@ export default function AppLayout() {
       <Stack.Screen name="applications/new" options={{ title: 'New Application' }} />
       <Stack.Screen name="applications/[id]/index" options={{ title: 'Application' }} />
       <Stack.Screen
+        name="applications/[id]/add-member"
+        options={{ title: 'Add Member', presentation: 'modal' }}
+      />
+      <Stack.Screen
         name="applications/[id]/upload"
         options={{ title: 'Upload Document', presentation: 'modal' }}
       />

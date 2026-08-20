@@ -1,10 +1,10 @@
 import { apiRequest } from './client';
-import { Application } from './types';
+import { Application, ApplicationStatus, GroupType, Participant } from './types';
 
-// Mirrors backend/src/applications/dto/participant.dto.ts — the leader's
-// personal details. Group member management isn't part of this pass (see
-// the Week 6 scope note in the mobile README).
-export interface LeaderInput {
+// Mirrors backend/src/applications/dto/participant.dto.ts — the shared
+// shape for both the trek leader and a group member (BUILD_SPEC.md
+// Section 4: one table, one DTO, for the same reason).
+export interface ParticipantInput {
   fullName: string;
   identityNumber: string;
   dateOfBirth?: string;
@@ -14,41 +14,78 @@ export interface LeaderInput {
   emergencyContactName?: string;
   emergencyContactMobile?: string;
   medicalDeclaration?: boolean;
+  isGuide?: boolean;
+  guideRegistrationNo?: string;
 }
 
-export interface CreateApplicationInput {
+interface CreateIndividualInput {
+  type: 'individual';
   trekRouteId: string;
   startDate: string;
   endDate: string;
-  leader: LeaderInput;
+  leader: ParticipantInput;
 }
 
-export function fetchApplications(): Promise<Application[]> {
-  return apiRequest('/applications');
+interface CreateGroupInput {
+  type: 'group';
+  groupType: GroupType;
+  trekRouteId: string;
+  startDate: string;
+  endDate: string;
+  leader: ParticipantInput;
+  // Commercial-only — backend/src/applications/dto/create-application.dto.ts
+  // requires all three together, only when groupType is 'commercial'.
+  operatorName?: string;
+  operatorRegistrationNo?: string;
+  operatorRegValidUntil?: string;
+}
+
+export type CreateApplicationInput = CreateIndividualInput | CreateGroupInput;
+
+export function fetchApplications(status?: ApplicationStatus): Promise<Application[]> {
+  const query = status ? `?status=${status}` : '';
+  return apiRequest(`/applications${query}`);
 }
 
 export function fetchApplication(id: string): Promise<Application> {
   return apiRequest(`/applications/${id}`);
 }
 
-// Individual only — always sends type: 'individual', matching this pass's
-// scope (see backend/src/applications/dto/create-application.dto.ts for
-// the group/commercial fields this deliberately omits).
 export function createApplication(input: CreateApplicationInput): Promise<Application> {
-  return apiRequest('/applications', {
+  return apiRequest('/applications', { method: 'POST', body: input });
+}
+
+// Group applications only — an individual application's sole participant
+// is created inline by createApplication(); the leader can't be added
+// this way (backend rejects it, and there's nothing to add one to before
+// the application itself exists).
+export function addMember(
+  applicationId: string,
+  member: ParticipantInput,
+): Promise<Participant> {
+  return apiRequest(`/applications/${applicationId}/participants`, {
     method: 'POST',
-    body: { ...input, type: 'individual' },
+    body: member,
   });
 }
 
-export function updateLeader(
+export function updateParticipant(
   applicationId: string,
   participantId: string,
-  patch: Partial<LeaderInput>,
-): Promise<Application['participants'][number]> {
+  patch: Partial<ParticipantInput>,
+): Promise<Participant> {
   return apiRequest(`/applications/${applicationId}/participants/${participantId}`, {
     method: 'PATCH',
     body: patch,
+  });
+}
+
+// The leader can't be removed this way (backend refuses it) — only ever
+// call this for a non-leader member, and only while the application is
+// still a draft.
+export function removeMember(applicationId: string, participantId: string): Promise<void> {
+  return apiRequest(`/applications/${applicationId}/participants/${participantId}`, {
+    method: 'DELETE',
   });
 }
 

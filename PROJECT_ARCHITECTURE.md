@@ -235,9 +235,10 @@ trek-permit/
 | File | Purpose | Calls | Important Functions |
 |---|---|---|---|
 | `app/(app)/(tabs)/routes.tsx` | Lists open treks | `src/api/routes.ts` | `RoutesScreen()` |
-| `app/(app)/applications/new.tsx` | The application creation form (individual only — see [Section 27](#27-unknowns--things-that-could-not-be-confirmed)) | `src/api/routes.ts`, `src/api/applications.ts` | `NewApplicationScreen()` |
+| `app/(app)/applications/new.tsx` | The application creation form — individual or group (private/commercial), with operator fields for commercial | `src/api/routes.ts`, `src/api/applications.ts`, `src/components/ParticipantForm.tsx` | `NewApplicationScreen()` |
 | `app/(app)/(tabs)/applications.tsx` | Lists the trekker's own applications | `src/api/applications.ts` | `ApplicationsScreen()` |
-| `app/(app)/applications/[id]/index.tsx` | Application detail: status, document checklist, submit button, link to the issued permit | `src/api/applications.ts`, `src/api/routes.ts` | `ApplicationDetailScreen()` |
+| `app/(app)/applications/[id]/index.tsx` | Application detail: status, every participant's own document checklist, add/remove member, submit button, link to the issued permit | `src/api/applications.ts`, `src/api/routes.ts` | `ApplicationDetailScreen()`, `ParticipantSection()` |
+| `app/(app)/applications/[id]/add-member.tsx` | Adds one group member (name + Aadhaar minimum; the officer decides the rest at review time) | `src/api/applications.ts`, `src/components/ParticipantForm.tsx` | `AddMemberScreen()` |
 | `app/(app)/applications/[id]/upload.tsx` | Camera/gallery/PDF picker → upload | `src/api/documents.ts`, `expo-image-picker`, `expo-document-picker` | `UploadDocumentScreen()` |
 | `app/(app)/permits/[id].tsx` | Displays the issued permit's QR code | `src/api/permits.ts`, `react-native-qrcode-svg` | `PermitScreen()` |
 
@@ -1348,7 +1349,7 @@ Check:
 | Change which roles can do what | The route's `@Roles(...)` decorator in the relevant `*.controller.ts` | `backend/src/common/guards/roles.guard.ts` if the ROLE CHECK logic itself needs to change |
 | Change the Trekker mobile UI | The relevant screen under `mobile/app/(app)/` | The matching `mobile/src/api/*.ts` file if the request/response shape is involved |
 | Change the Field Officer offline verification logic | `mobile/src/offline/verifyPermit.ts` | `mobile/src/offline/store.ts` if the cached data shape changes too |
-| Add group-member management to the mobile Trekker UI | `mobile/app/(app)/applications/new.tsx` and `[id]/index.tsx` (currently individual-only) | `backend/src/applications/applications.controller.ts` `addParticipant`/`updateParticipant`/`removeParticipant` — the backend already supports this |
+| Change group-application handling in the mobile Trekker UI | `mobile/app/(app)/applications/new.tsx` (type/groupType/operator fields), `[id]/index.tsx` + `[id]/add-member.tsx` (member management) | `mobile/src/components/ParticipantForm.tsx` (shared leader/member fields), `mobile/src/api/applications.ts` |
 | Change the department dashboard | `dashboard/app/(dashboard)/applications/` — the review queue and detail/decision/issue/revoke screens | `dashboard/lib/api/*.ts` if the request/response shape is involved; `dashboard/README.md` |
 | Change global rate limits | `backend/src/app.module.ts` `ThrottlerModule.forRoot(...)` | Per-route `@Throttle(...)` overrides, e.g. on `auth.controller.ts`'s OTP-request route |
 | Change JWT session length | `.env` `JWT_EXPIRES_IN` | `backend/src/auth/auth.module.ts` for the default fallback value |
@@ -1370,9 +1371,9 @@ TREK PERMIT
 │   └── Officer/admin CRUD
 │
 ├── Applications — trekker side (backend/src/applications, mobile/app/(app)/applications)
-│   ├── Create (individual — backend also supports group, mobile UI doesn't yet)
-│   ├── Add/update/remove group member (backend only)
-│   ├── Upload documents (versioned) (backend/src/documents, mobile upload.tsx)
+│   ├── Create (individual, or group — private/commercial)
+│   ├── Add/remove group member (mobile add-member.tsx; update has no UI on either client)
+│   ├── Upload documents (versioned), per participant (backend/src/documents, mobile upload.tsx)
 │   └── Submit
 │
 ├── Applications — officer side (backend/src/applications, backend/src/participants,
@@ -1473,7 +1474,7 @@ If you only remember 10 things about this codebase, remember these:
 - **Whether `SMS_PROVIDER=msg91`/`twilio` and `STORAGE_PROVIDER=s3` are actually planned for a later phase, or were sketched in `.env.example` and then deliberately deferred**, could not be confirmed — `docs/BUILD_SPEC.md` mentions them as the eventual real values but doesn't commit to a timeline.
 - ~~Whether the Next.js department dashboard is still planned~~ — resolved: it now exists (`dashboard/`, added in a later pass than this document's original survey). What's still unconfirmed: whether its current scope (review queue, decisions, issuance, revocation) is the department's full intended feature set, or whether further screens (route management, audit log viewing, notifications) are still expected — nothing in `docs/BUILD_SPEC.md` specifies the dashboard's scope beyond "application list, member-by-member review, corrections, prior-rejection flag."
 - **Production infrastructure** (hosting, CI/CD, process management, database backups, TLS termination) is entirely outside this repository — no Dockerfile, no CI workflow file, no infrastructure-as-code of any kind exists to inspect.
-- **Whether the "group" application type has ever been exercised through the mobile app** — the backend has supported it since Week 3 (per commit history), but no mobile screen constructs a `type: 'group'` request; `mobile/src/api/applications.ts` hardcodes `type: 'individual'`. Whether group support was tested via direct API calls during development could not be confirmed from the repository.
+- ~~Whether the "group" application type has ever been exercised through the mobile app~~ — resolved: the mobile Trekker UI now builds real `type: 'group'` requests (`app/(app)/applications/new.tsx`), and member add/remove (`add-member.tsx`, `[id]/index.tsx`) round-trip against the real backend — verified directly against the running API with the exact request shapes the mobile code sends, including the commercial-only operator fields and a guide member.
 - **The exact production deployment target implied by `docs/BUILD_SPEC.md`'s "future infrastructure migration is a configuration change" line** — no specific cloud provider, container setup, or hosting plan is referenced anywhere in code or config.
 
 ---

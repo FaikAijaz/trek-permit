@@ -1,10 +1,14 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { fetchApplication, submitApplication } from '../../../../src/api/applications';
+import {
+  fetchApplication,
+  removeMember,
+  submitApplication,
+} from '../../../../src/api/applications';
 import { fetchRoute } from '../../../../src/api/routes';
 import { ApiError } from '../../../../src/api/client';
-import { Application, TrekRoute, DocumentType } from '../../../../src/api/types';
+import { Application, DocumentType, Participant, TrekRoute } from '../../../../src/api/types';
 import { Screen } from '../../../../src/components/Screen';
 import { StatusBadge } from '../../../../src/components/StatusBadge';
 import { PrimaryButton } from '../../../../src/components/PrimaryButton';
@@ -56,6 +60,29 @@ export default function ApplicationDetailScreen() {
     }
   }
 
+  function confirmRemove(member: Participant) {
+    Alert.alert(
+      'Remove member?',
+      `${member.fullName} will be removed from this application.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setError(null);
+            try {
+              await removeMember(id, member.id);
+              await load();
+            } catch (err) {
+              setError(err instanceof ApiError ? err.message : 'Could not remove this member');
+            }
+          },
+        },
+      ],
+    );
+  }
+
   if (!application || !route) {
     return (
       <Screen scroll={false}>
@@ -66,16 +93,12 @@ export default function ApplicationDetailScreen() {
     );
   }
 
-  const leader = application.participants.find((p) => p.isLeader)!;
-  const currentDocTypes = new Set(
-    leader.documents.filter((d) => d.isCurrent).map((d) => d.documentType),
-  );
+  const isGroup = application.type === 'group';
+  const permit = application.permits?.[0];
   // Same rule the backend enforces (getApplicationForDocumentUpload): a
   // draft can always be edited; once submitted, only a participant the
   // officer flagged CORRECTION_REQUESTED can still receive a new document.
-  const canUploadDocuments =
-    application.status === 'draft' || leader.status === 'CORRECTION_REQUESTED';
-  const permit = application.permits?.[0];
+  const canManage = application.status === 'draft';
 
   return (
     <Screen>
@@ -87,7 +110,13 @@ export default function ApplicationDetailScreen() {
       </View>
       <Text style={{ color: colors.muted, marginTop: 8 }}>
         {application.startDate.slice(0, 10)} → {application.endDate.slice(0, 10)}
+        {isGroup ? ` · ${application.groupType} group` : ''}
       </Text>
+      {application.operatorName && (
+        <Text style={{ color: colors.muted, marginTop: 2 }}>
+          Operator: {application.operatorName} ({application.operatorRegistrationNo})
+        </Text>
+      )}
 
       {application.rejectionReason && (
         <View style={{ backgroundColor: `${colors.danger}15`, borderRadius: 8, padding: 12, marginTop: 16 }}>
@@ -105,31 +134,29 @@ export default function ApplicationDetailScreen() {
         </View>
       )}
 
-      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 24, marginBottom: 8 }}>
-        {leader.fullName}
-      </Text>
-      <StatusBadge status={leader.status} />
-      {leader.officerRemark && (
-        <Text style={{ color: colors.text, marginTop: 8 }}>
-          Officer's note: {leader.officerRemark}
+      <View style={{ marginTop: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>
+          {isGroup ? `Participants (${application.participants.length})` : 'Your details'}
         </Text>
-      )}
+        {isGroup && canManage && (
+          <Pressable
+            onPress={() =>
+              router.push({ pathname: '/(app)/applications/[id]/add-member', params: { id: application.id } })
+            }
+          >
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>+ Add member</Text>
+          </Pressable>
+        )}
+      </View>
 
-      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 24, marginBottom: 8 }}>
-        Documents
-      </Text>
-      {route.requiredDocuments.map((docType) => (
-        <DocumentRow
-          key={docType}
-          documentType={docType}
-          isUploaded={currentDocTypes.has(docType)}
-          canUpload={canUploadDocuments}
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/applications/[id]/upload',
-              params: { id: application.id, participantId: leader.id, documentType: docType },
-            })
-          }
+      {application.participants.map((participant) => (
+        <ParticipantSection
+          key={participant.id}
+          applicationId={application.id}
+          participant={participant}
+          requiredDocuments={route.requiredDocuments}
+          canManage={canManage}
+          onRemove={() => confirmRemove(participant)}
         />
       ))}
 
@@ -153,6 +180,93 @@ export default function ApplicationDetailScreen() {
         </View>
       )}
     </Screen>
+  );
+}
+
+function ParticipantSection({
+  applicationId,
+  participant,
+  requiredDocuments,
+  canManage,
+  onRemove,
+}: {
+  applicationId: string;
+  participant: Participant;
+  requiredDocuments: DocumentType[];
+  canManage: boolean;
+  onRemove: () => void;
+}) {
+  const currentDocTypes = new Set(
+    participant.documents.filter((d) => d.isCurrent).map((d) => d.documentType),
+  );
+  // Only submission is leader-gated (BUILD_SPEC.md Section 2, #5 — members
+  // can stay incomplete past submission); document upload follows the same
+  // draft-or-correction rule for every participant alike.
+  const canUploadDocuments = canManage || participant.status === 'CORRECTION_REQUESTED';
+
+  return (
+    <View
+      style={{
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 12,
+        padding: 14,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>
+            {participant.fullName}
+          </Text>
+          {participant.isLeader && (
+            <View
+              style={{
+                marginLeft: 8,
+                backgroundColor: colors.surface,
+                borderRadius: 6,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.muted }}>LEADER</Text>
+            </View>
+          )}
+        </View>
+        <StatusBadge status={participant.status} />
+      </View>
+
+      {participant.officerRemark && (
+        <Text style={{ color: colors.text, marginTop: 6, fontSize: 13 }}>
+          Officer's note: {participant.officerRemark}
+        </Text>
+      )}
+
+      <View style={{ marginTop: 10 }}>
+        {requiredDocuments.map((docType) => (
+          <DocumentRow
+            key={docType}
+            documentType={docType}
+            isUploaded={currentDocTypes.has(docType)}
+            canUpload={canUploadDocuments}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/applications/[id]/upload',
+                params: { id: applicationId, participantId: participant.id, documentType: docType },
+              })
+            }
+          />
+        ))}
+      </View>
+
+      {canManage && !participant.isLeader && (
+        <Pressable onPress={onRemove} style={{ marginTop: 10, alignSelf: 'flex-start' }}>
+          <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>
+            Remove from group
+          </Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
