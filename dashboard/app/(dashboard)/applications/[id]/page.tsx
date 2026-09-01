@@ -10,10 +10,12 @@ import {
 import { fetchParticipant } from '@/lib/api/participants';
 import { fetchRoute } from '@/lib/api/routes';
 import { issuePermit, revokePermit } from '@/lib/api/permits';
+import { fetchApplicationActivity } from '@/lib/api/audit-log';
 import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth-context';
 import {
   Application,
+  AuditLogEntry,
   ParticipantDetail,
   TrekRoute,
   UnresolvedParticipant,
@@ -21,6 +23,7 @@ import {
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/Button';
 import { QrCode } from '@/components/QrCode';
+import { AuditLogTable } from '@/components/AuditLogTable';
 import { ParticipantCard } from './ParticipantCard';
 
 const REVIEW_STATUSES = ['submitted', 'under_review'];
@@ -40,6 +43,7 @@ export default function ApplicationDetailPage({
     Record<string, ParticipantDetail>
   >({});
   const [error, setError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<AuditLogEntry[] | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [unresolved, setUnresolved] = useState<UnresolvedParticipant[] | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -64,6 +68,12 @@ export default function ApplicationDetailPage({
       setParticipantDetails(
         Object.fromEntries(participantResults.map((p) => [p.id, p])),
       );
+      // Best-effort, separate from the main load — an officer without
+      // audit-log access (see AuditController) shouldn't lose the whole
+      // page over a 403 here, they just don't get an Activity section.
+      fetchApplicationActivity(app)
+        .then(setActivity)
+        .catch(() => setActivity(null));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load this application');
     }
@@ -353,6 +363,13 @@ export default function ApplicationDetailPage({
       )}
 
       {!leader && <p className="text-sm text-red-700">No trek leader found on this application.</p>}
+
+      {activity && activity.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Activity</h2>
+          <AuditLogTable entries={activity} />
+        </div>
+      )}
     </div>
   );
 }
