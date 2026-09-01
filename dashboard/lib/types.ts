@@ -124,6 +124,22 @@ export interface Application {
   permits?: Permit[];
 }
 
+// Mirrors backend/src/audit/audit.service.ts's AuditLogEntry (AuditLog +
+// its joined actor). entityType is a free-form string set by whichever
+// service logged it ('application', 'participant', 'permit', 'trek_route',
+// 'document', 'user') — not modeled as a union here since nothing on the
+// dashboard branches on it beyond display.
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata: unknown;
+  ipAddress: string | null;
+  createdAt: string;
+  actor: { id: string; fullName: string | null; mobile: string; role: UserRole } | null;
+}
+
 // The structured 400/409 bodies submit() and issue() send — see
 // backend/src/applications/applications.service.ts / permits.service.ts.
 export interface UnresolvedParticipant {

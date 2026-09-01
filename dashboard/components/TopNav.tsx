@@ -27,6 +27,11 @@ export function TopNav() {
             <Link href="/routes" className="text-gray-600 hover:text-gray-900">
               Routes
             </Link>
+            {user?.role === 'admin' && (
+              <Link href="/audit-log" className="text-gray-600 hover:text-gray-900">
+                Audit log
+              </Link>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-500">
