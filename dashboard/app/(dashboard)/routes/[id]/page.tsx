@@ -6,6 +6,9 @@ import { deleteRoute, fetchRoute, RouteInput, updateRoute } from '@/lib/api/rout
 import { ApiError } from '@/lib/api/client';
 import { RouteForm } from '@/components/RouteForm';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
+import { Banner } from '@/components/Banner';
+import { LoadingState, ErrorState } from '@/components/StateMessage';
 
 export default function EditRoutePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -70,10 +73,10 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
   }
 
   if (loadError) {
-    return <p className="text-sm text-red-700">{loadError}</p>;
+    return <ErrorState>{loadError}</ErrorState>;
   }
   if (!route) {
-    return <p className="text-sm text-gray-400">Loading…</p>;
+    return <LoadingState />;
   }
 
   return (
@@ -85,7 +88,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
         &larr; Back to routes
       </button>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <Card className="p-6">
         <h1 className="mb-5 text-lg font-semibold text-gray-900">Edit trek route</h1>
         <RouteForm value={route} onChange={(patch) => setRoute((prev) => ({ ...prev!, ...patch }))} />
 
@@ -105,7 +108,7 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
         </div>
 
         {showDeleteConfirm && (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <Banner className="mt-4">
             <p>
               Delete <strong>{route.name}</strong>? This can&apos;t be undone. It will fail if any
               application already references this route.
@@ -118,9 +121,9 @@ export default function EditRoutePage({ params }: { params: Promise<{ id: string
                 Cancel
               </Button>
             </div>
-          </div>
+          </Banner>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

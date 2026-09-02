@@ -2,6 +2,8 @@
 
 import { RouteInput } from '@/lib/api/routes';
 import { DocumentType, RouteDifficulty } from '@/lib/types';
+import { Input } from '@/components/Input';
+import { Textarea } from '@/components/Textarea';
 
 const DOCUMENT_TYPES: DocumentType[] = [
   'aadhaar',
@@ -12,10 +14,6 @@ const DOCUMENT_TYPES: DocumentType[] = [
 ];
 
 const DIFFICULTIES: RouteDifficulty[] = ['easy', 'moderate', 'difficult'];
-
-const inputClass =
-  'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600';
-const labelClass = 'mb-1.5 block text-sm font-medium text-gray-700';
 
 /** Shared by the new-route and edit-route pages — mirrors
  * backend/src/routes/dto/create-route.dto.ts (update-route.dto.ts is just
@@ -39,39 +37,33 @@ export function RouteForm({
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className={labelClass}>Name</label>
-        <input
-          className={inputClass}
-          value={value.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="Tarsar Marsar"
-        />
-      </div>
+      <Input
+        label="Name"
+        className="w-full"
+        value={value.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+        placeholder="Tarsar Marsar"
+      />
+
+      <Input
+        label="Region"
+        className="w-full"
+        value={value.region}
+        onChange={(e) => onChange({ region: e.target.value })}
+        placeholder="Kashmir"
+      />
+
+      <Textarea
+        label="Description"
+        className="w-full"
+        rows={3}
+        value={value.description ?? ''}
+        onChange={(e) => onChange({ description: e.target.value })}
+        placeholder="Optional"
+      />
 
       <div>
-        <label className={labelClass}>Region</label>
-        <input
-          className={inputClass}
-          value={value.region}
-          onChange={(e) => onChange({ region: e.target.value })}
-          placeholder="Kashmir"
-        />
-      </div>
-
-      <div>
-        <label className={labelClass}>Description</label>
-        <textarea
-          className={inputClass}
-          rows={3}
-          value={value.description ?? ''}
-          onChange={(e) => onChange({ description: e.target.value })}
-          placeholder="Optional"
-        />
-      </div>
-
-      <div>
-        <label className={labelClass}>Difficulty</label>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">Difficulty</label>
         <div className="flex gap-2">
           {DIFFICULTIES.map((d) => {
             const selected = value.difficulty === d;
@@ -94,7 +86,7 @@ export function RouteForm({
       </div>
 
       <div>
-        <label className={labelClass}>Required documents</label>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">Required documents</label>
         <div className="flex flex-wrap gap-2">
           {DOCUMENT_TYPES.map((doc) => {
             const selected = requiredDocuments.includes(doc);
@@ -117,35 +109,33 @@ export function RouteForm({
       </div>
 
       <div className="flex gap-4">
-        <div className="flex-1">
-          <label className={labelClass}>Capacity per day</label>
-          <input
-            className={inputClass}
-            type="number"
-            min={1}
-            value={value.capacityPerDay ?? ''}
-            onChange={(e) =>
-              onChange({
-                capacityPerDay: e.target.value === '' ? undefined : Number(e.target.value),
-              })
-            }
-            placeholder="Unlimited"
-          />
-        </div>
-        <div className="flex-1">
-          <label className={labelClass}>Minimum lead time (days)</label>
-          <input
-            className={inputClass}
-            type="number"
-            min={0}
-            value={value.minLeadTimeDays ?? ''}
-            onChange={(e) =>
-              onChange({
-                minLeadTimeDays: e.target.value === '' ? undefined : Number(e.target.value),
-              })
-            }
-          />
-        </div>
+        <Input
+          label="Capacity per day"
+          className="w-full"
+          type="number"
+          min={1}
+          value={value.capacityPerDay ?? ''}
+          onChange={(e) =>
+            onChange({
+              capacityPerDay: e.target.value === '' ? undefined : Number(e.target.value),
+            })
+          }
+          placeholder="Unlimited"
+          wrapperClassName="flex-1"
+        />
+        <Input
+          label="Minimum lead time (days)"
+          className="w-full"
+          type="number"
+          min={0}
+          value={value.minLeadTimeDays ?? ''}
+          onChange={(e) =>
+            onChange({
+              minLeadTimeDays: e.target.value === '' ? undefined : Number(e.target.value),
+            })
+          }
+          wrapperClassName="flex-1"
+        />
       </div>
 
       <label className="flex items-center gap-2 text-sm text-gray-700">

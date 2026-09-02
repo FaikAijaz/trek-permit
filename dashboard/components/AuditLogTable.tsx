@@ -1,6 +1,8 @@
 'use client';
 
 import { AuditLogEntry } from '@/lib/types';
+import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/StateMessage';
 
 /** 'application.approved' -> 'Application approved'. */
 function formatAction(action: string): string {
@@ -17,14 +19,14 @@ export function AuditLogTable({
 }) {
   if (entries.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
-        {emptyMessage}
-      </div>
+      <Card>
+        <EmptyState>{emptyMessage}</EmptyState>
+      </Card>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+    <Card className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
           <tr>
@@ -54,6 +56,6 @@ export function AuditLogTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

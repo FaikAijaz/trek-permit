@@ -7,6 +7,11 @@ import { fetchRoutes } from '@/lib/api/routes';
 import { ApiError } from '@/lib/api/client';
 import { Application, ApplicationStatus, TrekRoute } from '@/lib/types';
 import { StatusBadge } from '@/components/StatusBadge';
+import { PageHeader } from '@/components/PageHeader';
+import { Card } from '@/components/Card';
+import { Input } from '@/components/Input';
+import { Select } from '@/components/Select';
+import { LoadingState, EmptyState, ErrorState } from '@/components/StateMessage';
 
 // Oldest-submission-first is the backend's own default for the staff
 // queue (applications.service.ts findAllForReview) — no client-side
@@ -66,10 +71,10 @@ export default function ApplicationsQueuePage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gray-900">Applications</h1>
-      <p className="mt-1 text-sm text-gray-500">
-        Every trekker&apos;s application, oldest submission first &mdash; this is the review queue.
-      </p>
+      <PageHeader
+        title="Applications"
+        subtitle="Every trekker's application, oldest submission first — this is the review queue."
+      />
 
       <div className="mt-6 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
@@ -88,34 +93,28 @@ export default function ApplicationsQueuePage() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <input
+        <Input
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search by reference, applicant name, or mobile…"
-          className="w-72 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+          className="w-72"
         />
-        <select
-          value={routeId}
-          onChange={(e) => setRouteId(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-        >
+        <Select value={routeId} onChange={(e) => setRouteId(e.target.value)}>
           <option value="">All routes</option>
           {routes.map((route) => (
             <option key={route.id} value={route.id}>
               {route.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white">
-        {applications === null && !error && (
-          <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
-        )}
-        {error && <div className="p-6 text-center text-sm text-red-700">{error}</div>}
+      <Card className="mt-6 overflow-hidden">
+        {applications === null && !error && <LoadingState />}
+        {error && <ErrorState>{error}</ErrorState>}
         {applications && applications.length === 0 && (
-          <div className="p-6 text-center text-sm text-gray-400">Nothing in this view.</div>
+          <EmptyState>Nothing in this view.</EmptyState>
         )}
         {applications?.map((app) => (
           <Link
@@ -134,7 +133,7 @@ export default function ApplicationsQueuePage() {
             <StatusBadge status={app.status} />
           </Link>
         ))}
-      </div>
+      </Card>
     </div>
   );
 }

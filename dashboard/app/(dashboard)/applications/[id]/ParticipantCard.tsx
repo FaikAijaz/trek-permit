@@ -7,6 +7,9 @@ import { ApiError } from '@/lib/api/client';
 import { Participant, ParticipantDetail } from '@/lib/types';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
+import { Banner } from '@/components/Banner';
+import { Textarea } from '@/components/Textarea';
 
 // backend/src/participants/participants.service.ts LEGAL_DECISIONS —
 // mirrored here only to decide which buttons to show; the backend is the
@@ -74,7 +77,7 @@ export function ParticipantCard({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <Card className="p-4">
       <div className="flex items-start justify-between">
         <div>
           <div className="font-medium text-gray-900">
@@ -98,7 +101,7 @@ export function ParticipantCard({
       )}
 
       {detail && detail.priorRejections.length > 0 && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
+        <Banner tone="warning" size="compact" className="mt-3">
           <p className="font-medium">
             Rejected before, under a different application, in the last 12 months:
           </p>
@@ -112,7 +115,7 @@ export function ParticipantCard({
             ))}
           </ul>
           <p className="mt-1 italic">Informational only — doesn&apos;t block this decision.</p>
-        </div>
+        </Banner>
       )}
 
       <div className="mt-3">
@@ -171,7 +174,7 @@ export function ParticipantCard({
 
           {openForm && (
             <div className="mt-2 space-y-2">
-              <textarea
+              <Textarea
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
                 placeholder={
@@ -180,7 +183,7 @@ export function ParticipantCard({
                     : 'What needs to be corrected?'
                 }
                 rows={2}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                className="w-full"
               />
               <Button
                 variant={openForm === 'REJECTED' ? 'danger' : 'primary'}
@@ -202,6 +205,6 @@ export function ParticipantCard({
       )}
 
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
-    </div>
+    </Card>
   );
 }

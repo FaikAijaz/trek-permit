@@ -6,6 +6,7 @@ import { requestOtp, verifyOtp } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
 
 const MOBILE_PATTERN = /^[0-9]{10}$/;
 
@@ -67,20 +68,16 @@ export default function LoginPage() {
 
         {step === 'mobile' ? (
           <form onSubmit={handleRequestOtp} className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Mobile number
-              </label>
-              <input
-                type="tel"
-                inputMode="numeric"
-                maxLength={10}
-                placeholder="10-digit mobile number"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value.replace(/[^0-9]/g, ''))}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-              />
-            </div>
+            <Input
+              label="Mobile number"
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              placeholder="10-digit mobile number"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/[^0-9]/g, ''))}
+              className="w-full"
+            />
             {error && <p className="text-sm text-red-700">{error}</p>}
             <Button
               type="submit"
@@ -96,14 +93,14 @@ export default function LoginPage() {
             <p className="text-sm text-gray-600">
               Enter the 6-digit code sent to <span className="font-medium">{mobile}</span>
             </p>
-            <input
+            <Input
               type="text"
               inputMode="numeric"
               maxLength={6}
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-center text-lg tracking-[0.5em] focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+              className="w-full text-center text-lg tracking-[0.5em]"
             />
             {error && <p className="text-sm text-red-700">{error}</p>}
             <Button

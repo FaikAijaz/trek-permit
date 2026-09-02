@@ -24,6 +24,10 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/Button';
 import { QrCode } from '@/components/QrCode';
 import { AuditLogTable } from '@/components/AuditLogTable';
+import { Card } from '@/components/Card';
+import { Banner } from '@/components/Banner';
+import { Textarea } from '@/components/Textarea';
+import { LoadingState, ErrorState } from '@/components/StateMessage';
 import { ParticipantCard } from './ParticipantCard';
 
 const REVIEW_STATUSES = ['submitted', 'under_review'];
@@ -153,10 +157,10 @@ export default function ApplicationDetailPage({
   }
 
   if (error) {
-    return <p className="text-sm text-red-700">{error}</p>;
+    return <ErrorState>{error}</ErrorState>;
   }
   if (!application) {
-    return <p className="text-sm text-gray-400">Loading…</p>;
+    return <LoadingState />;
   }
 
   const leader = application.participants.find((p) => p.isLeader);
@@ -179,7 +183,7 @@ export default function ApplicationDetailPage({
         &larr; Back to applications
       </button>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <Card className="p-5">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">{application.reference}</h1>
@@ -200,11 +204,11 @@ export default function ApplicationDetailPage({
         </div>
 
         {application.rejectionReason && (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <Banner className="mt-4">
             <span className="font-medium">Rejected:</span> {application.rejectionReason}
-          </div>
+          </Banner>
         )}
-      </div>
+      </Card>
 
       <div className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -223,14 +227,10 @@ export default function ApplicationDetailPage({
         ))}
       </div>
 
-      {actionError && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {actionError}
-        </div>
-      )}
+      {actionError && <Banner>{actionError}</Banner>}
 
       {canReview && (
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <Card className="p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Application decision
           </h2>
@@ -251,12 +251,12 @@ export default function ApplicationDetailPage({
           </div>
           {showRejectForm && (
             <div className="mt-3 space-y-2">
-              <textarea
+              <Textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Reason (route closed, dates unavailable, invalid operator registration…)"
                 rows={3}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                className="w-full"
               />
               <Button
                 variant="danger"
@@ -268,11 +268,11 @@ export default function ApplicationDetailPage({
               </Button>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {(canIssue || permit) && (
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <Card className="p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Permit</h2>
 
           {canIssue && !unresolved && (
@@ -284,7 +284,7 @@ export default function ApplicationDetailPage({
           )}
 
           {unresolved && unresolved.length > 0 && (
-            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <Banner tone="warning" className="mt-3">
               <p className="font-medium">
                 {unresolved.length} participant{unresolved.length > 1 ? 's are' : ' is'} still
                 unresolved:
@@ -308,7 +308,7 @@ export default function ApplicationDetailPage({
                   Cancel
                 </Button>
               </div>
-            </div>
+            </Banner>
           )}
 
           {permit && (
@@ -332,12 +332,12 @@ export default function ApplicationDetailPage({
                     </Button>
                     {showRevokeForm && (
                       <div className="mt-2 space-y-2">
-                        <textarea
+                        <Textarea
                           value={revokeReason}
                           onChange={(e) => setRevokeReason(e.target.value)}
                           placeholder="Reason for revocation"
                           rows={2}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                          className="w-full"
                         />
                         <Button
                           variant="danger"
@@ -359,7 +359,7 @@ export default function ApplicationDetailPage({
               </div>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {!leader && <p className="text-sm text-red-700">No trek leader found on this application.</p>}

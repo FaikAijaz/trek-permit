@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchRoutes, fetchVisitors, VisitorListItem } from '@/lib/api/routes';
 import { ApiError } from '@/lib/api/client';
 import { TrekRoute } from '@/lib/types';
+import { PageHeader } from '@/components/PageHeader';
+import { Card } from '@/components/Card';
+import { Input } from '@/components/Input';
+import { Select } from '@/components/Select';
+import { LoadingState, EmptyState, ErrorState } from '@/components/StateMessage';
 
 // YYYY-MM-DD in the browser's local timezone — Date#toISOString() would
 // shift this to UTC first, which can land on the wrong day.
@@ -46,48 +51,28 @@ export default function VisitorsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gray-900">Visitor list</h1>
-      <p className="mt-1 text-sm text-gray-500">
-        Who&apos;s on a route on a given date — approved participants only, read-only. Not a
-        check-in/check-out log.
-      </p>
+      <PageHeader
+        title="Visitor list"
+        subtitle="Who's on a route on a given date — approved participants only, read-only. Not a check-in/check-out log."
+      />
 
       <div className="mt-6 flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Route</label>
-          <select
-            value={routeId}
-            onChange={(e) => setRouteId(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-          >
-            {routes.length === 0 && <option value="">No routes</option>}
-            {routes.map((route) => (
-              <option key={route.id} value={route.id}>
-                {route.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
-          />
-        </div>
+        <Select label="Route" value={routeId} onChange={(e) => setRouteId(e.target.value)}>
+          {routes.length === 0 && <option value="">No routes</option>}
+          {routes.map((route) => (
+            <option key={route.id} value={route.id}>
+              {route.name}
+            </option>
+          ))}
+        </Select>
+        <Input label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
-        {visitors === null && !error && (
-          <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
-        )}
-        {error && <div className="p-6 text-center text-sm text-red-700">{error}</div>}
+      <Card className="mt-6 overflow-x-auto">
+        {visitors === null && !error && <LoadingState />}
+        {error && <ErrorState>{error}</ErrorState>}
         {visitors && visitors.length === 0 && (
-          <div className="p-6 text-center text-sm text-gray-400">
-            Nobody approved for this route on this date.
-          </div>
+          <EmptyState>Nobody approved for this route on this date.</EmptyState>
         )}
         {visitors && visitors.length > 0 && (
           <table className="w-full text-left text-sm">
@@ -129,7 +114,7 @@ export default function VisitorsPage() {
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

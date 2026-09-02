@@ -6,6 +6,10 @@ import { fetchRoutes } from '@/lib/api/routes';
 import { ApiError } from '@/lib/api/client';
 import { TrekRoute } from '@/lib/types';
 import { Button } from '@/components/Button';
+import { PageHeader } from '@/components/PageHeader';
+import { Card } from '@/components/Card';
+import { Input } from '@/components/Input';
+import { LoadingState, EmptyState, ErrorState } from '@/components/StateMessage';
 
 export default function RoutesPage() {
   const [routes, setRoutes] = useState<TrekRoute[] | null>(null);
@@ -38,42 +42,34 @@ export default function RoutesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Trek routes</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            What trekkers can apply against — open/closed, required documents, lead time.
-          </p>
-        </div>
-        <Link href="/routes/new">
-          <Button>New route</Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Trek routes"
+        subtitle="What trekkers can apply against — open/closed, required documents, lead time."
+        action={
+          <Link href="/routes/new">
+            <Button>New route</Button>
+          </Link>
+        }
+      />
 
       <div className="mt-6">
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or region…"
-          className="w-72 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+          className="w-72"
         />
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white">
-        {routes === null && !error && (
-          <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
-        )}
-        {error && <div className="p-6 text-center text-sm text-red-700">{error}</div>}
+      <Card className="mt-4 overflow-hidden">
+        {routes === null && !error && <LoadingState />}
+        {error && <ErrorState>{error}</ErrorState>}
         {routes && routes.length === 0 && (
-          <div className="p-6 text-center text-sm text-gray-400">
-            No routes yet — create the first one.
-          </div>
+          <EmptyState>No routes yet — create the first one.</EmptyState>
         )}
         {routes && routes.length > 0 && visibleRoutes?.length === 0 && (
-          <div className="p-6 text-center text-sm text-gray-400">
-            No routes match &quot;{search.trim()}&quot;.
-          </div>
+          <EmptyState>No routes match &quot;{search.trim()}&quot;.</EmptyState>
         )}
         {visibleRoutes?.map((route) => (
           <Link
@@ -102,7 +98,7 @@ export default function RoutesPage() {
             </span>
           </Link>
         ))}
-      </div>
+      </Card>
     </div>
   );
 }
