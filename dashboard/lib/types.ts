@@ -122,6 +122,11 @@ export interface Application {
   submittedAt: string | null;
   participants: Participant[];
   permits?: Permit[];
+  // Only the list endpoint (GET /applications) includes this — see
+  // backend/src/applications/applications.service.ts's ApplicationListItem.
+  // findOneForUser (the detail endpoint) doesn't, same optionality pattern
+  // as `permits` above.
+  applicant?: { id: string; fullName: string | null; mobile: string };
 }
 
 // Mirrors backend/src/audit/audit.service.ts's AuditLogEntry (AuditLog +

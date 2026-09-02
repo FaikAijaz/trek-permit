@@ -34,6 +34,21 @@ type ApplicationWithParticipants = Application & {
 // application detail view instead of a separate lookup.
 type ApplicationDetail = ApplicationWithParticipants & { permits: Permit[] };
 
+// findAllForUser/findAllForReview's shape — the applicant's own name/mobile
+// joined in, both to display on the list and to search against (see
+// buildWhere()'s OR clause).
+export type ApplicationListItem = Application & {
+  applicant: { id: string; fullName: string | null; mobile: string };
+};
+
+export interface FindApplicationsFilter {
+  status?: ApplicationStatus;
+  search?: string;
+  trekRouteId?: string;
+  from?: Date;
+  to?: Date;
+}
+
 @Injectable()
 export class ApplicationsService {
   constructor(
@@ -142,20 +157,56 @@ export class ApplicationsService {
     return application;
   }
 
+  // Shared by both queries below. `search` matches on reference OR the
+  // applicant's name/mobile — three separate `contains` checks joined by
+  // Prisma's `OR`, not a single ILIKE against a concatenated column, since
+  // there's no generated/indexed column to concatenate them into.
+  private buildWhere(
+    filter: FindApplicationsFilter,
+  ): Prisma.ApplicationWhereInput {
+    return {
+      status: filter.status,
+      trekRouteId: filter.trekRouteId,
+      startDate:
+        filter.from || filter.to
+          ? { gte: filter.from, lte: filter.to }
+          : undefined,
+      OR: filter.search
+        ? [
+            { reference: { contains: filter.search, mode: 'insensitive' } },
+            {
+              applicant: {
+                fullName: { contains: filter.search, mode: 'insensitive' },
+              },
+            },
+            { applicant: { mobile: { contains: filter.search } } },
+          ]
+        : undefined,
+    };
+  }
+
   async findAllForUser(
     applicantUserId: string,
-    status?: ApplicationStatus,
-  ): Promise<Application[]> {
+    filter: FindApplicationsFilter,
+  ): Promise<ApplicationListItem[]> {
     return this.prisma.application.findMany({
-      where: { applicantUserId, status },
+      where: { ...this.buildWhere(filter), applicantUserId },
+      include: {
+        applicant: { select: { id: true, fullName: true, mobile: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   /** The officer's queue — every application, not just one applicant's. */
-  async findAllForReview(status?: ApplicationStatus): Promise<Application[]> {
+  async findAllForReview(
+    filter: FindApplicationsFilter,
+  ): Promise<ApplicationListItem[]> {
     return this.prisma.application.findMany({
-      where: { status },
+      where: this.buildWhere(filter),
+      include: {
+        applicant: { select: { id: true, fullName: true, mobile: true } },
+      },
       // Oldest submission first — a plain fairness default, not a policy
       // call; nothing in the spec dictates a review order.
       orderBy: { submittedAt: 'asc' },

@@ -18,7 +18,10 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/types/jwt-payload.type';
-import { ApplicationsService } from './applications.service';
+import {
+  ApplicationListItem,
+  ApplicationsService,
+} from './applications.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { FindApplicationsQueryDto } from './dto/find-applications-query.dto';
 import { ParticipantDto } from './dto/participant.dto';
@@ -39,16 +42,26 @@ export class ApplicationsController {
   }
 
   // Officers/admins see every application (their review queue); a trekker
-  // only ever sees their own.
+  // only ever sees their own. `search`/`trekRouteId`/`from`/`to` are
+  // primarily for that staff queue (see docs/WEEK7_SPEC.md Section 2) but
+  // apply equally to a trekker's own list — harmless there, since it's
+  // already scoped to their applicant id.
   @Get()
   findAll(
     @Query() query: FindApplicationsQueryDto,
     @CurrentUser() user: JwtPayload,
-  ): Promise<Application[]> {
+  ): Promise<ApplicationListItem[]> {
     const isStaff = user.role === 'officer' || user.role === 'admin';
+    const filter = {
+      status: query.status,
+      search: query.search,
+      trekRouteId: query.trekRouteId,
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+    };
     return isStaff
-      ? this.applicationsService.findAllForReview(query.status)
-      : this.applicationsService.findAllForUser(user.sub, query.status);
+      ? this.applicationsService.findAllForReview(filter)
+      : this.applicationsService.findAllForUser(user.sub, filter);
   }
 
   @Get(':id')
