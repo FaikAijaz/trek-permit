@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import {
   fetchNotifications,
@@ -9,6 +9,8 @@ import {
 import { ApiError } from '../../../src/api/client';
 import { AppNotification } from '../../../src/api/types';
 import { Screen } from '../../../src/components/Screen';
+import { ListCard } from '../../../src/components/ListCard';
+import { EmptyMessage } from '../../../src/components/EmptyMessage';
 import { useNotifications } from '../../../src/context/NotificationsContext';
 import { colors } from '../../../src/theme';
 
@@ -70,18 +72,8 @@ export default function NotificationsScreen() {
 
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
 
-  if (notifications === null && !error) {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      </Screen>
-    );
-  }
-
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} loading={notifications === null && !error}>
       <FlatList
         contentContainerStyle={{ padding: 20 }}
         data={notifications ?? []}
@@ -97,22 +89,11 @@ export default function NotificationsScreen() {
             </Pressable>
           ) : null
         }
-        ListEmptyComponent={
-          <Text style={{ color: colors.muted, textAlign: 'center', marginTop: 40 }}>
-            {error ?? 'No notifications yet.'}
-          </Text>
-        }
+        ListEmptyComponent={<EmptyMessage>{error ?? 'No notifications yet.'}</EmptyMessage>}
         renderItem={({ item }) => (
-          <Pressable
+          <ListCard
             onPress={() => !item.isRead && handleMarkRead(item.id)}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 12,
-              backgroundColor: item.isRead ? colors.background : `${colors.primary}11`,
-            }}
+            style={{ backgroundColor: item.isRead ? colors.background : `${colors.primary}11` }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {!item.isRead && (
@@ -133,7 +114,7 @@ export default function NotificationsScreen() {
             <Text style={{ color: colors.muted, marginTop: 6, fontSize: 12 }}>
               {new Date(item.createdAt).toLocaleString()}
             </Text>
-          </Pressable>
+          </ListCard>
         )}
       />
     </Screen>

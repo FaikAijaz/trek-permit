@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { fetchRoute } from '../../../src/api/routes';
 import { createApplication, ParticipantInput } from '../../../src/api/applications';
@@ -118,13 +118,7 @@ export default function NewApplicationScreen() {
   }
 
   if (!route && !routeError) {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      </Screen>
-    );
+    return <Screen scroll={false} loading />;
   }
 
   if (routeError || !route) {

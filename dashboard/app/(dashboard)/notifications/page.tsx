@@ -9,6 +9,9 @@ import {
 import { ApiError } from '@/lib/api/client';
 import { AppNotification } from '@/lib/types';
 import { Button } from '@/components/Button';
+import { PageHeader } from '@/components/PageHeader';
+import { Card } from '@/components/Card';
+import { LoadingState, EmptyState, ErrorState } from '@/components/StateMessage';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<AppNotification[] | null>(null);
@@ -55,27 +58,23 @@ export default function NotificationsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Notifications</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Status changes on applications, participants, and permits.
-          </p>
-        </div>
-        {unreadCount > 0 && (
-          <Button variant="secondary" onClick={handleMarkAllRead} loading={isMarkingAll}>
-            Mark all as read
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Notifications"
+        subtitle="Status changes on applications, participants, and permits."
+        action={
+          unreadCount > 0 ? (
+            <Button variant="secondary" onClick={handleMarkAllRead} loading={isMarkingAll}>
+              Mark all as read
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white">
-        {notifications === null && !error && (
-          <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
-        )}
-        {error && <div className="p-6 text-center text-sm text-red-700">{error}</div>}
+      <Card className="mt-6 overflow-hidden">
+        {notifications === null && !error && <LoadingState />}
+        {error && <ErrorState>{error}</ErrorState>}
         {notifications && notifications.length === 0 && (
-          <div className="p-6 text-center text-sm text-gray-400">No notifications yet.</div>
+          <EmptyState>No notifications yet.</EmptyState>
         )}
         {notifications?.map((n) => (
           <div
@@ -102,7 +101,7 @@ export default function NotificationsPage() {
             )}
           </div>
         ))}
-      </div>
+      </Card>
     </div>
   );
 }

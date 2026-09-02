@@ -6,6 +6,7 @@ import { createRoute, RouteInput } from '@/lib/api/routes';
 import { ApiError } from '@/lib/api/client';
 import { RouteForm } from '@/components/RouteForm';
 import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
 
 const EMPTY_ROUTE: RouteInput = {
   name: '',
@@ -46,7 +47,7 @@ export default function NewRoutePage() {
         &larr; Back to routes
       </button>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <Card className="p-6">
         <h1 className="mb-5 text-lg font-semibold text-gray-900">New trek route</h1>
         <RouteForm value={route} onChange={(patch) => setRoute((prev) => ({ ...prev, ...patch }))} />
 
@@ -57,7 +58,7 @@ export default function NewRoutePage() {
             Create route
           </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

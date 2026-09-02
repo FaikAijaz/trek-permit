@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { fetchApplications } from '../../../src/api/applications';
 import { ApiError } from '../../../src/api/client';
 import { Application } from '../../../src/api/types';
 import { Screen } from '../../../src/components/Screen';
+import { ListCard } from '../../../src/components/ListCard';
+import { EmptyMessage } from '../../../src/components/EmptyMessage';
 import { StatusBadge } from '../../../src/components/StatusBadge';
 import { useAuth } from '../../../src/context/AuthContext';
 import { colors } from '../../../src/theme';
@@ -36,18 +38,8 @@ export default function ApplicationsScreen() {
     setIsRefreshing(false);
   }
 
-  if (applications === null && !error) {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      </Screen>
-    );
-  }
-
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} loading={applications === null && !error}>
       <FlatList
         contentContainerStyle={{ padding: 20 }}
         data={applications ?? []}
@@ -59,22 +51,15 @@ export default function ApplicationsScreen() {
           </Pressable>
         }
         ListEmptyComponent={
-          <Text style={{ color: colors.muted, textAlign: 'center', marginTop: 40 }}>
+          <EmptyMessage>
             {error ?? "You haven't applied for a permit yet. Check the Treks tab to start one."}
-          </Text>
+          </EmptyMessage>
         }
         renderItem={({ item }) => (
-          <Pressable
+          <ListCard
             onPress={() =>
               router.push({ pathname: '/(app)/applications/[id]', params: { id: item.id } })
             }
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 12,
-            }}
           >
             <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>
               {item.reference}
@@ -84,7 +69,7 @@ export default function ApplicationsScreen() {
               {item.type === 'group' ? ` · ${item.groupType} group` : ''}
             </Text>
             <StatusBadge status={item.status} />
-          </Pressable>
+          </ListCard>
         )}
       />
     </Screen>

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { fetchPermit } from '../../../src/api/permits';
@@ -28,13 +28,7 @@ export default function PermitScreen() {
   );
 
   if (!permit && !error) {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      </Screen>
-    );
+    return <Screen scroll={false} loading />;
   }
 
   if (error || !permit) {
