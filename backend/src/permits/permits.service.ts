@@ -8,6 +8,7 @@ import {
 import { Permit } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ReferenceService } from '../reference/reference.service';
 import { SigningService } from './signing.service';
 import { IssuePermitDto } from './dto/issue-permit.dto';
@@ -47,6 +48,7 @@ export class PermitsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
     private readonly referenceService: ReferenceService,
     private readonly signingService: SigningService,
   ) {}
@@ -197,6 +199,18 @@ export class PermitsService {
       });
     }
 
+    await this.notificationsService.create({
+      userId: application.applicantUserId,
+      type: 'permit_issued',
+      title: 'Permit issued',
+      body:
+        unresolved.length > 0
+          ? `${permit.reference} has been issued for ${application.reference} (${unresolved.length} unresolved participant${unresolved.length === 1 ? '' : 's'} excluded).`
+          : `${permit.reference} has been issued for ${application.reference}.`,
+      entityType: 'permit',
+      entityId: permit.id,
+    });
+
     return permit;
   }
 
@@ -300,6 +314,15 @@ export class PermitsService {
       entityType: 'permit',
       entityId: permit.id,
       metadata: { reference: permit.reference, reason: dto.reason },
+    });
+
+    await this.notificationsService.create({
+      userId: permit.application.applicantUserId,
+      type: 'permit_revoked',
+      title: 'Permit revoked',
+      body: `${permit.reference} (${permit.application.reference}) has been revoked: ${dto.reason}`,
+      entityType: 'permit',
+      entityId: permit.id,
     });
   }
 }

@@ -91,6 +91,18 @@ enum PermitStatus {
   @@map("permit_status")
 }
 
+/// One value per user-facing event a trekker/trek leader would want to
+/// know about — a deliberate subset of AuditLog's much wider action list
+/// (e.g. a route edit isn't here). See docs/WEEK7_SPEC.md Section 4.
+enum NotificationType {
+  application_status_changed
+  correction_requested
+  permit_issued
+  permit_revoked
+
+  @@map("notification_type")
+}
+
 // ── Models ─────────────────────────────────────────────────────────────
 
 model User {
@@ -104,12 +116,13 @@ model User {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  applicationsApplied  Application[] @relation("ApplicantUser")
-  applicationsDecided  Application[] @relation("DecidedByUser")
-  participantsReviewed Participant[] @relation("ReviewedByUser")
-  permitsIssued        Permit[]      @relation("IssuedByUser")
-  revocationsMade      Revocation[]  @relation("RevokedByUser")
-  auditLogEntries      AuditLog[]    @relation("ActorUser")
+  applicationsApplied  Application[]  @relation("ApplicantUser")
+  applicationsDecided  Application[]  @relation("DecidedByUser")
+  participantsReviewed Participant[]  @relation("ReviewedByUser")
+  permitsIssued        Permit[]       @relation("IssuedByUser")
+  revocationsMade      Revocation[]   @relation("RevokedByUser")
+  auditLogEntries      AuditLog[]     @relation("ActorUser")
+  notifications        Notification[]
 
   @@map("users")
 }
@@ -316,6 +329,28 @@ model AuditLog {
   @@index([actorUserId])
   @@index([entityType, entityId])
   @@map("audit_log")
+}
+
+/// A user-facing inbox entry — emitted alongside (not instead of) the
+/// AuditLog entry for the same event, at the subset of call sites that
+/// represent something a trekker/trek leader would want to know about.
+/// See docs/WEEK7_SPEC.md Section 4.
+model Notification {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+
+  type       NotificationType
+  title      String           @db.VarChar(200)
+  body       String
+  entityType String           @map("entity_type") @db.VarChar(50)
+  entityId   String           @map("entity_id") @db.Uuid
+
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }
 
 /// Backs atomic, per-year reference numbers (APP-2026-000001, PMT-2026-000001).

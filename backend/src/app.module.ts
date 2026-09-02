@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './audit/audit.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AuthModule } from './auth/auth.module';
 import { RoutesModule } from './routes/routes.module';
 import { ReferenceModule } from './reference/reference.module';
@@ -22,6 +23,7 @@ import { PermitsModule } from './permits/permits.module';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     PrismaModule,
     AuditModule,
+    NotificationsModule,
     ReferenceModule,
     AuthModule,
     RoutesModule,
