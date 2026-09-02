@@ -6,6 +6,7 @@ import {
 import { Participant, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   DecideParticipantDto,
   ParticipantDecision,
@@ -33,6 +34,7 @@ export class ParticipantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /** Everything an officer needs on one screen to decide this person. */
@@ -170,6 +172,38 @@ export class ParticipantsService {
           reference: application.reference,
           reason: 'leader_rejected',
         },
+      });
+    }
+
+    // CORRECTION_REQUESTED gets its own notification type — APPROVED and
+    // REJECTED both fold into 'application_status_changed', the same
+    // bucket applications.service.ts's approve()/reject() use, since
+    // both represent "something about your application moved."
+    await this.notificationsService.create({
+      userId: application.applicantUserId,
+      type:
+        dto.decision === 'CORRECTION_REQUESTED'
+          ? 'correction_requested'
+          : 'application_status_changed',
+      title:
+        dto.decision === 'CORRECTION_REQUESTED'
+          ? `Correction requested for ${participant.fullName}`
+          : `${participant.fullName} ${dto.decision.toLowerCase()}`,
+      body: dto.remark
+        ? `${application.reference}: ${dto.remark}`
+        : `${application.reference}: ${participant.fullName} was ${dto.decision.toLowerCase()}.`,
+      entityType: 'participant',
+      entityId: participant.id,
+    });
+
+    if (applicationUpdate?.status === 'rejected') {
+      await this.notificationsService.create({
+        userId: application.applicantUserId,
+        type: 'application_status_changed',
+        title: 'Application rejected',
+        body: `${application.reference} was rejected: the trek leader was rejected.`,
+        entityType: 'application',
+        entityId: application.id,
       });
     }
 

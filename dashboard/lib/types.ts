@@ -145,6 +145,24 @@ export interface AuditLogEntry {
   actor: { id: string; fullName: string | null; mobile: string; role: UserRole } | null;
 }
 
+export type NotificationType =
+  | 'application_status_changed'
+  | 'correction_requested'
+  | 'permit_issued'
+  | 'permit_revoked';
+
+// Mirrors backend/src/notifications/notifications.service.ts's Notification.
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  entityType: string;
+  entityId: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 // The structured 400/409 bodies submit() and issue() send — see
 // backend/src/applications/applications.service.ts / permits.service.ts.
 export interface UnresolvedParticipant {

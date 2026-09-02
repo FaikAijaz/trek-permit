@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ReferenceService } from '../reference/reference.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { ParticipantDto } from './dto/participant.dto';
@@ -54,6 +55,7 @@ export class ApplicationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
     private readonly referenceService: ReferenceService,
   ) {}
 
@@ -535,6 +537,15 @@ export class ApplicationsService {
       metadata: { reference: application.reference },
     });
 
+    await this.notificationsService.create({
+      userId: application.applicantUserId,
+      type: 'application_status_changed',
+      title: 'Application approved',
+      body: `${application.reference} has been approved.`,
+      entityType: 'application',
+      entityId: application.id,
+    });
+
     return approved;
   }
 
@@ -576,6 +587,15 @@ export class ApplicationsService {
       entityType: 'application',
       entityId: application.id,
       metadata: { reference: application.reference, reason },
+    });
+
+    await this.notificationsService.create({
+      userId: application.applicantUserId,
+      type: 'application_status_changed',
+      title: 'Application rejected',
+      body: `${application.reference} was rejected: ${reason}`,
+      entityType: 'application',
+      entityId: application.id,
     });
 
     return rejected;

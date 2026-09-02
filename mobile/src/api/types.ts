@@ -130,3 +130,21 @@ export interface Application {
   participants: Participant[];
   permits?: Permit[];
 }
+
+export type NotificationType =
+  | 'application_status_changed'
+  | 'correction_requested'
+  | 'permit_issued'
+  | 'permit_revoked';
+
+// Mirrors backend/src/notifications/notifications.service.ts's Notification.
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  entityType: string;
+  entityId: string;
+  isRead: boolean;
+  createdAt: string;
+}
