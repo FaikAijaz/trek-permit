@@ -18,9 +18,10 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/types/jwt-payload.type';
-import { RoutesService } from './routes.service';
+import { RoutesService, VisitorListItem } from './routes.service';
 import { CreateRouteDto } from './dto/create-route.dto';
 import { UpdateRouteDto } from './dto/update-route.dto';
+import { FindVisitorsQueryDto } from './dto/find-visitors-query.dto';
 
 @Controller('routes')
 export class RoutesController {
@@ -35,6 +36,18 @@ export class RoutesController {
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string): Promise<TrekRoute> {
     return this.routesService.findOne(id);
+  }
+
+  // Staff only — a read-only roster, but still one field officers and
+  // admins need, not trekkers. See docs/WEEK7_SPEC.md Section 3.
+  @Get(':id/visitors')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.officer, UserRole.admin)
+  findVisitors(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: FindVisitorsQueryDto,
+  ): Promise<VisitorListItem[]> {
+    return this.routesService.findVisitors(id, new Date(query.date));
   }
 
   @Post()
