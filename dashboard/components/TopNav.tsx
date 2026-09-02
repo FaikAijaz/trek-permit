@@ -27,6 +27,9 @@ export function TopNav() {
             <Link href="/routes" className="text-gray-600 hover:text-gray-900">
               Routes
             </Link>
+            <Link href="/visitors" className="text-gray-600 hover:text-gray-900">
+              Visitors
+            </Link>
             {user?.role === 'admin' && (
               <Link href="/audit-log" className="text-gray-600 hover:text-gray-900">
                 Audit log

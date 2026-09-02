@@ -45,3 +45,20 @@ export function updateRoute(id: string, patch: Partial<RouteInput>): Promise<Tre
 export function deleteRoute(id: string): Promise<void> {
   return apiRequest(`/routes/${id}`, { method: 'DELETE' });
 }
+
+// Mirrors backend/src/routes/routes.service.ts's VisitorListItem.
+export interface VisitorListItem {
+  participantId: string;
+  fullName: string;
+  identityLast4: string;
+  isLeader: boolean;
+  isGuide: boolean;
+  mobile: string | null;
+  applicationReference: string;
+  permitStatus: 'active' | 'revoked' | null;
+}
+
+/** `date` as YYYY-MM-DD. */
+export function fetchVisitors(routeId: string, date: string): Promise<VisitorListItem[]> {
+  return apiRequest(`/routes/${routeId}/visitors?date=${date}`);
+}
