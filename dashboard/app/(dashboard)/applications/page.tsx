@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { fetchApplications } from '@/lib/api/applications';
+import { fetchRoutes } from '@/lib/api/routes';
 import { ApiError } from '@/lib/api/client';
-import { Application, ApplicationStatus } from '@/lib/types';
+import { Application, ApplicationStatus, TrekRoute } from '@/lib/types';
 import { StatusBadge } from '@/components/StatusBadge';
 
 // Oldest-submission-first is the backend's own default for the staff
@@ -19,24 +20,49 @@ const FILTERS: { label: string; value: ApplicationStatus | undefined }[] = [
   { label: 'All', value: undefined },
 ];
 
+// Debounced, same idea as the route filter but server-side here — the
+// applications list can grow past what's reasonable to filter client-side
+// (search matches the applicant's name/mobile too, which isn't in the
+// list response's un-filtered form anyway — see FindApplicationsFilter).
+const SEARCH_DEBOUNCE_MS = 300;
+
 export default function ApplicationsQueuePage() {
   const [filter, setFilter] = useState<ApplicationStatus | undefined>('submitted');
+  const [routeId, setRouteId] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [routes, setRoutes] = useState<TrekRoute[]>([]);
   const [applications, setApplications] = useState<Application[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (status: ApplicationStatus | undefined) => {
-    setApplications(null);
-    setError(null);
-    try {
-      setApplications(await fetchApplications(status));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not load applications');
-    }
+  useEffect(() => {
+    fetchRoutes().then(setRoutes).catch(() => setRoutes([]));
   }, []);
 
   useEffect(() => {
-    load(filter);
-  }, [filter, load]);
+    const timeout = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const load = useCallback(async () => {
+    setApplications(null);
+    setError(null);
+    try {
+      setApplications(
+        await fetchApplications({
+          status: filter,
+          search: search || undefined,
+          trekRouteId: routeId || undefined,
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load applications');
+    }
+  }, [filter, search, routeId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return (
     <div>
@@ -61,6 +87,28 @@ export default function ApplicationsQueuePage() {
         ))}
       </div>
 
+      <div className="mt-4 flex flex-wrap gap-3">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by reference, applicant name, or mobile…"
+          className="w-72 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+        />
+        <select
+          value={routeId}
+          onChange={(e) => setRouteId(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+        >
+          <option value="">All routes</option>
+          {routes.map((route) => (
+            <option key={route.id} value={route.id}>
+              {route.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white">
         {applications === null && !error && (
           <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
@@ -69,26 +117,23 @@ export default function ApplicationsQueuePage() {
         {applications && applications.length === 0 && (
           <div className="p-6 text-center text-sm text-gray-400">Nothing in this view.</div>
         )}
-        {applications?.map((app) => {
-          const leader = app.participants?.find((p) => p.isLeader);
-          return (
-            <Link
-              key={app.id}
-              href={`/applications/${app.id}`}
-              className="flex items-center justify-between border-b border-gray-100 px-4 py-3 last:border-b-0 hover:bg-gray-50"
-            >
-              <div>
-                <div className="font-medium text-gray-900">{app.reference}</div>
-                <div className="text-sm text-gray-500">
-                  {leader?.fullName ?? '—'} &middot; {app.type}
-                  {app.groupType ? ` (${app.groupType})` : ''} &middot;{' '}
-                  {app.startDate.slice(0, 10)} &rarr; {app.endDate.slice(0, 10)}
-                </div>
+        {applications?.map((app) => (
+          <Link
+            key={app.id}
+            href={`/applications/${app.id}`}
+            className="flex items-center justify-between border-b border-gray-100 px-4 py-3 last:border-b-0 hover:bg-gray-50"
+          >
+            <div>
+              <div className="font-medium text-gray-900">{app.reference}</div>
+              <div className="text-sm text-gray-500">
+                {app.applicant?.fullName ?? app.applicant?.mobile ?? '—'} &middot; {app.type}
+                {app.groupType ? ` (${app.groupType})` : ''} &middot;{' '}
+                {app.startDate.slice(0, 10)} &rarr; {app.endDate.slice(0, 10)}
               </div>
-              <StatusBadge status={app.status} />
-            </Link>
-          );
-        })}
+            </div>
+            <StatusBadge status={app.status} />
+          </Link>
+        ))}
       </div>
     </div>
   );

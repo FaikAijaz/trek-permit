@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 export default function RoutesPage() {
   const [routes, setRoutes] = useState<TrekRoute[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setError(null);
@@ -23,6 +24,17 @@ export default function RoutesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Client-side, not a server round-trip — see docs/WEEK7_SPEC.md Section 2:
+  // one department, one season, this list stays small enough that filtering
+  // the already-fetched array is simpler than adding query params for it.
+  const normalizedSearch = search.trim().toLowerCase();
+  const visibleRoutes = routes?.filter(
+    (route) =>
+      !normalizedSearch ||
+      route.name.toLowerCase().includes(normalizedSearch) ||
+      route.region.toLowerCase().includes(normalizedSearch),
+  );
 
   return (
     <div>
@@ -38,7 +50,17 @@ export default function RoutesPage() {
         </Link>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="mt-6">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or region…"
+          className="w-72 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+        />
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white">
         {routes === null && !error && (
           <div className="p-6 text-center text-sm text-gray-400">Loading…</div>
         )}
@@ -48,7 +70,12 @@ export default function RoutesPage() {
             No routes yet — create the first one.
           </div>
         )}
-        {routes?.map((route) => (
+        {routes && routes.length > 0 && visibleRoutes?.length === 0 && (
+          <div className="p-6 text-center text-sm text-gray-400">
+            No routes match &quot;{search.trim()}&quot;.
+          </div>
+        )}
+        {visibleRoutes?.map((route) => (
           <Link
             key={route.id}
             href={`/routes/${route.id}`}
