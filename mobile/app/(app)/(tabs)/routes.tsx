@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { fetchOpenRoutes } from '../../../src/api/routes';
 import { ApiError } from '../../../src/api/client';
 import { TrekRoute } from '../../../src/api/types';
 import { Screen } from '../../../src/components/Screen';
+import { ListCard } from '../../../src/components/ListCard';
+import { EmptyMessage } from '../../../src/components/EmptyMessage';
 import { colors } from '../../../src/theme';
 
 export default function RoutesScreen() {
@@ -35,40 +37,21 @@ export default function RoutesScreen() {
     setIsRefreshing(false);
   }
 
-  if (routes === null && !error) {
-    return (
-      <Screen scroll={false}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      </Screen>
-    );
-  }
-
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} loading={routes === null && !error}>
       <FlatList
         contentContainerStyle={{ padding: 20 }}
         data={routes ?? []}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
-          <Text style={{ color: colors.muted, textAlign: 'center', marginTop: 40 }}>
-            {error ?? 'No treks are currently open for applications.'}
-          </Text>
+          <EmptyMessage>{error ?? 'No treks are currently open for applications.'}</EmptyMessage>
         }
         renderItem={({ item }) => (
-          <Pressable
+          <ListCard
             onPress={() =>
               router.push({ pathname: '/(app)/applications/new', params: { routeId: item.id } })
             }
-            style={{
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 12,
-            }}
           >
             <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>
               {item.name}
@@ -82,7 +65,7 @@ export default function RoutesScreen() {
             <Text style={{ color: colors.muted, marginTop: 2 }}>
               Minimum {item.minLeadTimeDays} days' notice
             </Text>
-          </Pressable>
+          </ListCard>
         )}
       />
     </Screen>
